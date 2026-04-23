@@ -60,14 +60,14 @@ service cloud.firestore {
         && data.sender is string && data.sender.size() <= 100
         && data.receiver is string && data.receiver.size() <= 100
         && data.content is string && data.content.size() <= 5000
-        && data.timestamp is timestamp;
+        && (data.timestamp is timestamp || data.timestamp == request.time);
     }
 
     function isValidBlock(data) {
       return data.size() >= 3 && data.size() <= 10
         && data.blocker is string && data.blocker.size() <= 100
         && data.blocked is string && data.blocked.size() <= 100
-        && data.timestamp is timestamp;
+        && (data.timestamp is timestamp || data.timestamp == request.time);
     }
 
     function isValidProfile(data) {
@@ -90,8 +90,9 @@ service cloud.firestore {
     function isValidAnnouncement(data) {
       return data.size() >= 3 && data.size() <= 10
         && data.content is string && data.content.size() <= 5000
-        && data.type in ['message', 'goal']
-        && data.timestamp is timestamp;
+        && data.type in ['message', 'goal', 'player_feedback']
+        && (data.timestamp is timestamp || data.timestamp == request.time)
+        && (!('targetPlayer' in data) || (data.targetPlayer is string && data.targetPlayer.size() <= 100));
     }
 
     function isValidAvailability(data) {
@@ -102,14 +103,22 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidFaqItem(data) {
+      return data.size() == 3
+        && data.question is string && data.question.size() <= 500
+        && data.answer is string && data.answer.size() <= 5000
+        && data.order is number;
+    }
+
     function isValidDutyConfig(data) {
-      return data.size() == 6
+      return data.size() >= 6 && data.size() <= 7
         && data.id is string && data.id.size() <= 100
         && data.label is string && data.label.size() <= 100
         && data.type in ['player', 'parent']
         && data.maxPerWeek is number
         && data.maxPerType is number
-        && data.applicableTo in ['home', 'away', 'both'];
+        && data.applicableTo in ['home', 'away', 'both']
+        && (!('emoji' in data) || (data.emoji is string && data.emoji.size() <= 10));
     }
 
     // Pillar 3: Path Variable Hardening
@@ -117,6 +126,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(gameId) && isValidGame(incoming());
       allow update: if isValidId(gameId) && isValidGame(incoming());
+      allow delete: if true;
     }
 
     match /feedback/{feedbackId} {
@@ -161,6 +171,12 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isValidId(dutyId) && isValidDutyConfig(incoming());
       allow delete: if isValidId(dutyId);
+    }
+
+    match /faq/{faqId} {
+      allow read: if true;
+      allow create, update: if isValidId(faqId) && isValidFaqItem(incoming());
+      allow delete: if true;
     }
 
     match /users/{userId} {

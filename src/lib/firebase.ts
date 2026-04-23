@@ -67,7 +67,8 @@ export interface Block {
 export interface Announcement {
   id: string;
   content: string;
-  type: 'message' | 'goal';
+  type: 'message' | 'goal' | 'player_feedback';
+  targetPlayer?: string;
   timestamp: any;
 }
 
@@ -82,10 +83,18 @@ export interface Availability {
 export interface DutyConfig {
   id: string; // duty name
   label: string;
+  emoji?: string;
   type: 'player' | 'parent';
   maxPerWeek: number;
   maxPerType: number;
   applicableTo: 'home' | 'away' | 'both';
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  order: number;
 }
 
 export interface AppUser {
