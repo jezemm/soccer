@@ -37,7 +37,7 @@ import {
   Upload,
   Download
 } from 'lucide-react';
-import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, SquadPlayer } from './lib/firebase';
+import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 const TEAM_SQUAD = [
@@ -95,13 +95,10 @@ const getTravelTime = (location: string) => {
 export default function App() {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
   const [loading, setLoading] = useState(true);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [games, setGames] = useState<GameType[]>([]);
   const [view, setView] = useState<'fixtures' | 'squad' | 'game' | 'duties' | 'admin' | 'profile' | 'messages'>('fixtures');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('teamtrack_admin') === 'true');
-  const [isCoach, setIsCoach] = useState(localStorage.getItem('teamtrack_coach') === 'true');
-  const [coachPassword, setCoachPassword] = useState('');
   const [adminPass, setAdminPass] = useState('');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
@@ -110,7 +107,6 @@ export default function App() {
   const [coachChild, setCoachChild] = useState<string | null>(null);
   const [coachExemptDuties, setCoachExemptDuties] = useState<string[]>([]);
   const [messagingEnabled, setMessagingEnabled] = useState(true);
-  const [squadPasswords, setSquadPasswords] = useState<Record<string, string>>({});
   const [targetPlayerProfile, setTargetPlayerProfile] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { skills?: string, photoUrl?: string }>>({});
   const [feedbacks, setFeedbacks] = useState<PlayerFeedback[]>([]);
@@ -119,7 +115,6 @@ export default function App() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [dutiesConfig, setDutiesConfig] = useState<DutyConfig[]>([]);
-  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>(TEAM_SQUAD);
   const [playerLoginCode, setPlayerLoginCode] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<string | null>(null); // gameId-dutyId
@@ -134,9 +129,7 @@ export default function App() {
   useEffect(() => {
     const q = query(collection(db, 'games'), orderBy('date', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const g = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as GameType & { deleted?: boolean }))
-        .filter(g => !g.deleted);
+      const g = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GameType));
       setGames(g);
     });
     return () => unsubscribe();
@@ -153,24 +146,17 @@ export default function App() {
     return () => unsubscribe();
   }, []);
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      doc(db, 'settings', 'training'),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setTrainingCancelled(data.trainingCancelled);
-          setTrainingLocation(data.trainingLocation || 'Gardiner Park');
-          setHomeGround(data.homeGround || 'Central Park, Malvern VIC');
-          setCoachChild(data.coachChild || null);
-          setCoachExemptDuties(data.coachExemptDuties || []);
-          setMessagingEnabled(data.messagingEnabled !== false);
-          setSquadPasswords(data.squadPasswords || {});
-          setCoachPassword(data.coachPassword || '');
-        }
-        setSettingsLoaded(true);
-      },
-      () => setSettingsLoaded(true) // unblock login on error
-    );
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'training'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setTrainingCancelled(data.trainingCancelled);
+        setTrainingLocation(data.trainingLocation || 'Gardiner Park');
+        setHomeGround(data.homeGround || 'Central Park, Malvern VIC');
+        setCoachChild(data.coachChild || null);
+        setCoachExemptDuties(data.coachExemptDuties || []);
+        setMessagingEnabled(data.messagingEnabled !== false);
+      }
+    });
     return () => unsubscribe();
   }, []);
 
@@ -220,17 +206,6 @@ export default function App() {
     const unsubscribe = onSnapshot(collection(db, 'dutiesConfig'), (snapshot) => {
       const d = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DutyConfig));
       setDutiesConfig(d);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'squad'), (snapshot) => {
-      if (!snapshot.empty) {
-        const players = snapshot.docs.map(d => d.data() as SquadPlayer);
-        players.sort((a, b) => a.name.localeCompare(b.name));
-        setSquadPlayers(players);
-      }
     });
     return () => unsubscribe();
   }, []);
@@ -377,12 +352,12 @@ export default function App() {
     }
   };
 
-  const handleUpdateFeedback = async (playerName: string, feedback: string, goals: string) => {
+  const handleUpdateFeedback = async (gameId: string, playerName: string, feedback: string, goals: string) => {
     if (!isAdmin) return;
     try {
-      const feedbackId = playerName.replace(/\s+/g, '_');
+      const feedbackId = `${gameId}_${playerName.replace(/\s+/g, '_')}`;
       await setDoc(doc(db, 'feedback', feedbackId), {
-        gameId: '',
+        gameId,
         playerName,
         feedback,
         goals,
@@ -471,12 +446,27 @@ export default function App() {
   };
 
   const handleLogin = (playerName: string) => {
-    // Password source is exclusively Firebase: squadPasswords (settings/training) or squad collection inline
-    const correctPass = squadPasswords[playerName]
-      || squadPlayers.find(p => p.name === playerName)?.password
-      || 'EMJSC2026';
-
-    if (playerLoginCode === correctPass) {
+    const envKey = `VITE_PASS_${playerName.toUpperCase().replace(/\s+/g, '_')}`;
+    const metaEnv = (import.meta as any).env;
+    const correctPass = metaEnv ? metaEnv[envKey] : null;
+    
+    // Default fallback if no env var is set, using the fact-based pattern
+    const defaultPasswords: Record<string, string> = {
+      "Zephyr Y": "ATTITUDE26",
+      "Harry S": "CREATIVE26",
+      "Myles H": "SMILE26",
+      "Tanush P": "VISION26",
+      "Joshua M": "SPIRIT26",
+      "Thomas B": "FOCUS26",
+      "Benjamin C": "ENERGY26",
+      "Hugo D": "TOUCH26",
+      "Harvey M": "SPEED26",
+      "Julian B": "TEAMWORK26"
+    };
+    
+    const finalCorrectPass = correctPass || defaultPasswords[playerName] || 'EMJSC2026';
+    
+    if (playerLoginCode === finalCorrectPass) {
       localStorage.setItem('teamtrack_user', playerName);
       localStorage.setItem('teamtrack_admin', 'false');
       setUserName(playerName);
@@ -492,14 +482,8 @@ export default function App() {
   const logOut = () => {
     localStorage.removeItem('teamtrack_user');
     localStorage.removeItem('teamtrack_admin');
-    localStorage.removeItem('teamtrack_coach');
     setUserName(null);
     setIsAdmin(false);
-    setIsCoach(false);
-  };
-
-  const updateCoachPassword = async (password: string) => {
-    await setDoc(doc(db, 'settings', 'training'), { coachPassword: password }, { merge: true });
   };
 
   const handleSignUp = async (gameId: string, dutyId: string) => {
@@ -630,12 +614,12 @@ export default function App() {
 
     dutiesConfig.forEach(d => {
       dutyTypeCounts[d.id] = {};
-      squadPlayers.forEach(p => {
+      TEAM_SQUAD.forEach(p => {
         dutyTypeCounts[d.id][p.name] = 0;
       });
     });
 
-    squadPlayers.forEach(p => {
+    TEAM_SQUAD.forEach(p => {
       totalDutyCounts[p.name] = 0;
     });
 
@@ -673,7 +657,7 @@ export default function App() {
     });
 
     const getBalancedPlayer = (dutyId: string, excludedInThisGame: string[]) => {
-      const candidates = squadPlayers.filter(p => {
+      const candidates = TEAM_SQUAD.filter(p => {
         const name = p.name;
         const isExcluded = excludedInThisGame.includes(name);
         // COACH CHILD EXEMPTION LOGIC
@@ -794,7 +778,7 @@ export default function App() {
     if (!isAdmin) return;
     const batch = writeBatch(db);
     games.forEach(g => {
-      batch.update(doc(db, 'games', g.id), { deleted: true });
+      batch.delete(doc(db, 'games', g.id));
     });
     try {
       await batch.commit();
@@ -806,79 +790,16 @@ export default function App() {
     }
   };
 
-  const addGame = async (opponent: string, date: string, location: string, isHome: boolean) => {
-    if (!isAdmin) return;
-    const id = `game_${Date.now()}`;
-    const kickOff = date ? new Date(date).toLocaleTimeString('en-AU', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '';
-    try {
-      await setDoc(doc(db, 'games', id), { date, opponent, location, isHome, kickOff });
-      setAdminActionStatus('Match added');
-      setTimeout(() => setAdminActionStatus(null), 2000);
-    } catch (e) {
-      console.error(e);
-      setAdminActionStatus('Failed to add match');
-    }
-  };
-
   const deleteGame = async (gameId: string) => {
     if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'games', gameId), { deleted: true });
+      await deleteDoc(doc(db, 'games', gameId));
       setAdminActionStatus('Match removed');
       setTimeout(() => setAdminActionStatus(null), 2000);
     } catch (e) {
       console.error(e);
       setAdminActionStatus('Failed to delete match');
     }
-  };
-
-  const saveSquadPasswords = async (updated: Record<string, string>) => {
-    await setDoc(doc(db, 'settings', 'training'), { squadPasswords: updated }, { merge: true });
-  };
-
-  const addSquadPlayer = async (player: SquadPlayer) => {
-    if (!isAdmin) return;
-    if (player.password) {
-      await saveSquadPasswords({ ...squadPasswords, [player.name]: player.password });
-    }
-    const id = player.name.toLowerCase().replace(/\s+/g, '_');
-    const { password: _pw, ...roster } = player;
-    try { await setDoc(doc(db, 'squad', id), roster); } catch {}
-  };
-
-  const updateSquadPlayer = async (originalName: string, player: SquadPlayer) => {
-    if (!isAdmin) return;
-    const updated = { ...squadPasswords };
-    if (originalName !== player.name) {
-      if (updated[originalName]) { updated[player.name] = updated[originalName]; }
-      delete updated[originalName];
-    }
-    if (player.password !== undefined) {
-      if (player.password) { updated[player.name] = player.password; }
-      else { delete updated[player.name]; }
-    }
-    await saveSquadPasswords(updated);
-    const { password: _pw, ...roster } = player;
-    const originalId = originalName.toLowerCase().replace(/\s+/g, '_');
-    const newId = player.name.toLowerCase().replace(/\s+/g, '_');
-    try {
-      if (originalId !== newId) await deleteDoc(doc(db, 'squad', originalId));
-      await setDoc(doc(db, 'squad', newId), roster);
-    } catch {}
-  };
-
-  const deleteSquadPlayer = async (name: string) => {
-    if (!isAdmin) return;
-    const updated = { ...squadPasswords };
-    delete updated[name];
-    await saveSquadPasswords(updated);
-    const id = name.toLowerCase().replace(/\s+/g, '_');
-    try { await deleteDoc(doc(db, 'squad', id)); } catch {}
-  };
-
-  const updatePlayerPassword = async (playerName: string, newPassword: string) => {
-    const updated = { ...squadPasswords, [playerName]: newPassword };
-    await setDoc(doc(db, 'settings', 'training'), { squadPasswords: updated }, { merge: true });
   };
 
   const updateGame = async (gameId: string, updates: Partial<GameType>) => {
@@ -1064,7 +985,7 @@ export default function App() {
     }
   };
 
-  const handleSyncDribl = async (token?: string) => {
+  const handleSyncDribl = async () => {
     if (!isAdmin) return;
     setAdminActionStatus('Fetching from Dribl...');
     try {
@@ -1073,10 +994,9 @@ export default function App() {
           season: 'nPmrj2rmow',
           club: '3pmvQzZrdv',
           tenant: 'w8zdBWPmBX'
-        },
-        headers: token ? { 'X-Dribl-Token': token } : {}
+        }
       });
-
+      
       if (response.data) {
         await bulkSyncFixtures(response.data);
       }
@@ -1147,8 +1067,7 @@ export default function App() {
     }
   };
 
-  // Only block the login screen until Firebase passwords have loaded — logged-in users skip this
-  if (loading || (!userName && !settingsLoaded)) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
@@ -1158,46 +1077,27 @@ export default function App() {
 
   if (!userName) {
     return (
-      <div className="mobile-container bg-white min-h-screen overflow-y-auto">
-        {/* Staff buttons — top right */}
-        <div className="flex justify-end gap-2 p-4">
-          <button
-            onClick={() => setTargetPlayerProfile('COACH')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy hover:bg-slate-50 transition-colors"
-          >
-            <Flag className="w-3.5 h-3.5" />
-            Coach
-          </button>
-          <button
-            onClick={() => setTargetPlayerProfile('ADMIN')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy hover:bg-slate-50 transition-colors"
-          >
-            <Shield className="w-3.5 h-3.5" />
-            Admin
-          </button>
-        </div>
-
-        <div className="flex flex-col items-center px-8 pb-12 space-y-10">
-          <div className="flex flex-col items-center gap-6 text-center">
-            <img
-              src={CLUB_LOGO}
-              alt="EMJSC Logo"
-              className="w-32 drop-shadow-2xl"
-              referrerPolicy="no-referrer"
-            />
-            <div className="space-y-2">
-              <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
-              <p className="text-slate-500 text-sm font-bold italic">
-                {targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
-              </p>
-            </div>
+      <div className="mobile-container flex flex-col items-center p-8 space-y-10 bg-white min-h-screen">
+        <div className="flex flex-col items-center gap-6 mt-12 text-center">
+          <img 
+            src={CLUB_LOGO} 
+            alt="EMJSC Logo" 
+            className="w-32 drop-shadow-2xl" 
+            referrerPolicy="no-referrer"
+          />
+          <div className="space-y-2">
+            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
+            <p className="text-slate-500 text-sm font-bold italic">
+              {targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
+            </p>
           </div>
-
+        </div>
+        
         {!targetPlayerProfile ? (
           <>
-            <div className="w-full px-2 space-y-3">
-              {squadPlayers.map((player) => (
-                <button
+            <div className="w-full max-h-[50vh] overflow-y-auto px-2 space-y-3 custom-scrollbar">
+              {TEAM_SQUAD.map((player) => (
+                <button 
                   key={player.name}
                   onClick={() => setTargetPlayerProfile(player.name)}
                   className="w-full flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
@@ -1211,9 +1111,20 @@ export default function App() {
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Active Player</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emjsc-navy transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emjsc-navy transition-colors" />
                 </button>
               ))}
+            </div>
+
+            <div className="w-full pt-6 border-t border-slate-100 flex flex-col items-center gap-3">
+              <button 
+                  onClick={() => setTargetPlayerProfile('ADMIN')}
+                  className="w-full flex items-center justify-center gap-3 p-5 bg-emjsc-navy text-white rounded-2xl hover:bg-emjsc-navy underline-offset-4 hover:shadow-xl transition-all group active:scale-[0.98] shadow-lg shadow-blue-900/20"
+                >
+                  <Shield className="w-5 h-5 text-emjsc-red group-hover:animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">Team Manager Login</span>
+              </button>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest italic leading-none">Restricted to Coaches & Management</p>
             </div>
           </>
         ) : (
@@ -1225,9 +1136,9 @@ export default function App() {
                   {loginError}
                 </div>
               )}
-              <input
-                type="password"
-                placeholder={targetPlayerProfile === 'ADMIN' ? "Admin Password" : targetPlayerProfile === 'COACH' ? "Coach Password" : "Enter Player Password"}
+              <input 
+                type="password" 
+                placeholder={targetPlayerProfile === 'ADMIN' ? "Admin Password" : "Enter Player Password"} 
                 value={playerLoginCode}
                 onChange={(e) => setPlayerLoginCode(e.target.value)}
                 autoFocus
@@ -1236,19 +1147,16 @@ export default function App() {
                     if (targetPlayerProfile === 'ADMIN') {
                       const correctPass = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
-                        setIsAdmin(true); setIsCoach(false);
+                        setIsAdmin(true);
                         localStorage.setItem('teamtrack_admin', 'true');
                         localStorage.setItem('teamtrack_user', 'Administrator');
-                        setUserName('Administrator'); setPlayerLoginCode(''); setLoginError(null); setView('admin');
-                      } else { setLoginError('Invalid Administrator Password'); }
-                    } else if (targetPlayerProfile === 'COACH') {
-                      const correctPass = coachPassword || 'coach123';
-                      if (playerLoginCode === correctPass) {
-                        setIsCoach(true); setIsAdmin(false);
-                        localStorage.setItem('teamtrack_coach', 'true');
-                        localStorage.setItem('teamtrack_user', 'Coach');
-                        setUserName('Coach'); setPlayerLoginCode(''); setLoginError(null); setView('admin');
-                      } else { setLoginError('Invalid Coach Password'); }
+                        setUserName('Administrator');
+                        setPlayerLoginCode('');
+                        setLoginError(null);
+                        setView('admin');
+                      } else {
+                        setLoginError('Invalid Administrator Password');
+                      }
                     } else {
                       handleLogin(targetPlayerProfile);
                     }
@@ -1263,58 +1171,48 @@ export default function App() {
                 >
                   Back
                 </button>
-                <button
+                <button 
                   onClick={() => {
                     if (targetPlayerProfile === 'ADMIN') {
+                      // We need to set adminPass before calling handleAdminLogin
+                      // but state updates are async. However, handleAdminLogin can be updated to accept password or use local variable.
+                      // For now, let's just make it work.
                       const correctPass = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
-                        setIsAdmin(true); setIsCoach(false);
+                        setIsAdmin(true);
                         localStorage.setItem('teamtrack_admin', 'true');
                         localStorage.setItem('teamtrack_user', 'Administrator');
-                        setUserName('Administrator'); setPlayerLoginCode(''); setLoginError(null); setView('admin');
-                      } else { setLoginError('Invalid Administrator Password'); }
-                    } else if (targetPlayerProfile === 'COACH') {
-                      const correctPass = coachPassword || 'coach123';
-                      if (playerLoginCode === correctPass) {
-                        setIsCoach(true); setIsAdmin(false);
-                        localStorage.setItem('teamtrack_coach', 'true');
-                        localStorage.setItem('teamtrack_user', 'Coach');
-                        setUserName('Coach'); setPlayerLoginCode(''); setLoginError(null); setView('admin');
-                      } else { setLoginError('Invalid Coach Password'); }
+                        setUserName('Administrator');
+                        setPlayerLoginCode('');
+                        setLoginError(null);
+                        setView('admin');
+                      } else {
+                        setLoginError('Invalid Administrator Password');
+                      }
                     } else {
                       handleLogin(targetPlayerProfile);
                     }
                   }}
                   className="flex-[2] bg-emjsc-navy text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform"
                 >
-                  {targetPlayerProfile === 'ADMIN' ? 'Login as Admin' : targetPlayerProfile === 'COACH' ? 'Login as Coach' : 'Confirm Password'}
+                  {targetPlayerProfile === 'ADMIN' ? 'Login as Admin' : 'Confirm Password'}
                 </button>
               </div>
             </div>
             <p className="text-center text-[10px] text-slate-400 font-bold uppercase py-4">
-              {targetPlayerProfile === 'ADMIN' ? 'Restricted Access Area' : targetPlayerProfile === 'COACH' ? 'Coach Access Only' : 'Password required for squad privacy'}
+              {targetPlayerProfile === 'ADMIN' ? 'Restricted Access Area' : 'Password required for squad privacy'}
             </p>
           </div>
         )}
         
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] text-center mt-4 pb-4">
-            Central Park Malvern • VIC
-          </p>
-        </div>
+        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] text-center mt-auto pb-4">
+          Central Park Malvern • VIC
+        </p>
       </div>
     );
   }
 
   const totalUnreadMessages = messages.filter(m => m.receiver === userName && !m.read).length;
-
-  const totalDutySwaps = games.reduce((count, game) => {
-    const swapMap = game.swapRequests || {};
-    if (Object.keys(swapMap).length > 0) {
-      return count + Object.values(swapMap).filter(Boolean).length;
-    }
-    // Legacy fields for older games
-    return count + [game.snackSwapRequested, game.marshalSwapRequested, game.refereeSwapRequested, game.goalieSwapRequested].filter(Boolean).length;
-  }, 0);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1358,13 +1256,13 @@ export default function App() {
 
           <nav className="flex flex-col gap-2">
             <DesktopNavButton active={view === 'fixtures' || view === 'game'} onClick={() => setView('fixtures')} icon={<Calendar className="w-5 h-5" />} label="Schedule" />
-            <DesktopNavButton active={view === 'duties'} onClick={() => setView('duties')} icon={<Shield className="w-5 h-5" />} label="Duties" badge={totalDutySwaps} />
+            <DesktopNavButton active={view === 'duties'} onClick={() => setView('duties')} icon={<Shield className="w-5 h-5" />} label="Duties" />
             <DesktopNavButton active={view === 'squad'} onClick={() => setView('squad')} icon={<Users className="w-5 h-5" />} label="Squad" />
             <DesktopNavButton active={view === 'profile'} onClick={() => setView('profile')} icon={<UserIcon className="w-5 h-5" />} label="My Profile" />
             {messagingEnabled && (
               <DesktopNavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
             )}
-            {(isAdmin || isCoach) && <DesktopNavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-5 h-5" />} label={isCoach ? 'Coach' : 'Admin'} />}
+            {isAdmin && <DesktopNavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-5 h-5" />} label="Admin" />}
           </nav>
 
           <div className="mt-auto pt-6 border-t border-slate-100 flex flex-col gap-4">
@@ -1428,13 +1326,13 @@ export default function App() {
                   className="absolute top-full left-0 right-0 bg-white border-b border-slate-200 shadow-xl p-4 flex flex-col gap-2 z-50"
                 >
                   <MobileNavItem active={view === 'fixtures' || view === 'game'} onClick={() => { setView('fixtures'); setMobileMenuOpen(false); }} icon={<Calendar className="w-5 h-5" />} label="Schedule" />
-                  <MobileNavItem active={view === 'duties'} onClick={() => { setView('duties'); setMobileMenuOpen(false); }} icon={<Shield className="w-5 h-5" />} label="Duties" badge={totalDutySwaps} />
+                  <MobileNavItem active={view === 'duties'} onClick={() => { setView('duties'); setMobileMenuOpen(false); }} icon={<Shield className="w-5 h-5" />} label="Duties" />
                   <MobileNavItem active={view === 'squad'} onClick={() => { setView('squad'); setMobileMenuOpen(false); }} icon={<Users className="w-5 h-5" />} label="Squad" />
                   <MobileNavItem active={view === 'profile'} onClick={() => { setView('profile'); setMobileMenuOpen(false); }} icon={<UserIcon className="w-5 h-5" />} label="My Profile" />
                   {messagingEnabled && (
                     <MobileNavItem active={view === 'messages'} onClick={() => { setView('messages'); setMobileMenuOpen(false); }} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
                   )}
-                  {(isAdmin || isCoach) && <MobileNavItem active={view === 'admin'} onClick={() => { setView('admin'); setMobileMenuOpen(false); }} icon={<Settings className="w-5 h-5" />} label={isCoach ? 'Coach' : 'Admin Hub'} />}
+                  {isAdmin && <MobileNavItem active={view === 'admin'} onClick={() => { setView('admin'); setMobileMenuOpen(false); }} icon={<Settings className="w-5 h-5" />} label="Admin Hub" />}
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                       <img 
@@ -1567,32 +1465,9 @@ export default function App() {
 
                         // Arrival time is fixed at 30 minutes prior to kick off
                         const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const nextApplicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
-                          { id: 'goalie', label: 'Goalie', applicableTo: 'both' },
-                          { id: 'snack_provider', label: 'Snack', applicableTo: 'both' },
-                          { id: 'pitch_marshal', label: 'Marshal', applicableTo: 'home' },
-                          { id: 'referee', label: 'Referee', applicableTo: 'home' }
-                        ]).filter((d: any) => {
-                          if (d.applicableTo === 'both' || !d.applicableTo) return true;
-                          if (d.applicableTo === 'home' && game.isHome) return true;
-                          if (d.applicableTo === 'away' && !game.isHome) return true;
-                          return false;
-                        });
-                        const getNextAssignee = (d: any) =>
-                          (game.assignments?.[d.id]) ||
-                          (d.id === 'goalie' ? game.goalie :
-                           d.id === 'snack_provider' ? game.snackProvider :
-                           d.id === 'pitch_marshal' ? game.pitchMarshal :
-                           d.id === 'referee' ? game.referee : null);
-                        const isMissingDuties = nextApplicableDuties.some((d: any) => !getNextAssignee(d));
-                        const isSwapPending = nextApplicableDuties.some((d: any) =>
-                          (game.swapRequests?.[d.id]) ||
-                          (d.id === 'goalie' ? game.goalieSwapRequested :
-                           d.id === 'snack_provider' ? game.snackSwapRequested :
-                           d.id === 'pitch_marshal' ? game.marshalSwapRequested :
-                           d.id === 'referee' ? game.refereeSwapRequested : false)
-                        );
-                        const coachNotes = feedbacks.some((f: any) => f.playerName === userName && (f.feedback || f.goals));
+                        const isMissingDuties = !game.snackProvider || (game.isHome && (!game.pitchMarshal || !game.referee)) || !game.goalie;
+                        const isSwapPending = game.snackSwapRequested || game.marshalSwapRequested || game.refereeSwapRequested || game.goalieSwapRequested;
+                        const coachNotes = feedbacks.some(f => f.gameId === game.id);
 
                         return (
                           <section className="space-y-4">
@@ -1637,15 +1512,10 @@ export default function App() {
                                     <h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">
                                       vs {game.opponent}
                                     </h3>
-                                    <a
-                                      href={game.mapUrlOverride || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-tighter hover:text-emjsc-navy transition-colors"
-                                    >
+                                    <p className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-tighter">
                                       <MapPin className="w-3.5 h-3.5 text-emjsc-red" />
                                       <span className="line-clamp-1">{game.location}</span>
-                                    </a>
+                                    </p>
                                   </div>
                                 </div>
 
@@ -1681,7 +1551,7 @@ export default function App() {
                                       if (d.applicableTo === 'home' && game.isHome) return true;
                                       if (d.applicableTo === 'away' && !game.isHome) return true;
                                       return false;
-                                    }).map((duty: any) => {
+                                    }).slice(0, 4).map((duty: any) => {
                                       const assignee = (game.assignments && game.assignments[duty.id]) || (duty.id === 'goalie' ? game.goalie : duty.id === 'snack_provider' ? game.snackProvider : duty.id === 'pitch_marshal' ? game.pitchMarshal : duty.id === 'referee' ? game.referee : null);
                                       const icon = duty.id === 'snack_provider' ? <Utensils className="w-3.5 h-3.5 text-slate-400" /> :
                                                    duty.id === 'pitch_marshal' ? <Shield className="w-3.5 h-3.5 text-slate-400" /> :
@@ -1794,7 +1664,7 @@ export default function App() {
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {squadPlayers.map((player) => (
+                      {TEAM_SQUAD.map((player) => (
                         <div key={player.name} className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4 hover:shadow-md transition-shadow group overflow-hidden">
                           <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-emjsc-navy rounded-2xl flex items-center justify-center text-xl font-black text-white border-2 border-emjsc-red group-hover:rotate-3 transition-transform overflow-hidden shrink-0 relative">
@@ -1853,31 +1723,29 @@ export default function App() {
 
                 {view === 'game' && selectedGame && (
                   <div className="max-w-4xl mx-auto">
-                    <GameDetailView
-                      game={games.find(g => g.id === selectedGame.id) || selectedGame}
+                    <GameDetailView 
+                      game={games.find(g => g.id === selectedGame.id) || selectedGame} 
                       user={{ displayName: userName }}
                       homeGround={homeGround}
                       feedbacks={feedbacks}
                       availabilities={availabilities}
                       onToggleAvailability={handleToggleAvailability}
-                      onBack={() => setView('fixtures')}
+                      onBack={() => setView('fixtures')} 
                       onSignUp={handleSignUp}
                       onRequestSwap={handleRequestSwap}
                       isSyncing={isSyncing}
-                      dutiesConfig={dutiesConfig}
                     />
                   </div>
                 )}
 
                 {view === 'profile' && (
                   <div className="max-w-2xl mx-auto">
-                    <ProfileView
-                      userName={userName || ''}
-                      profiles={profiles}
+                    <ProfileView 
+                      userName={userName || ''} 
+                      profiles={profiles} 
                       feedbacks={feedbacks}
-                      onUpdateProfile={updateProfile}
-                      squadPasswords={squadPasswords}
-                      onUpdatePassword={updatePlayerPassword}
+                      games={games}
+                      onUpdateProfile={updateProfile} 
                     />
                   </div>
                 )}
@@ -1888,7 +1756,7 @@ export default function App() {
                       userName={userName || ''} 
                       messages={messages} 
                       blocks={blocks} 
-                      teamSquad={squadPlayers}
+                      teamSquad={TEAM_SQUAD}
                       isAdmin={isAdmin}
                       onSendMessage={handleSendMessage} 
                       onBlockUser={handleBlockUser} 
@@ -1911,14 +1779,13 @@ export default function App() {
                           onAdminDeleteBlock={handleAdminDeleteBlock}
                           onAddAnnouncement={handleAddAnnouncement}
                           onDeleteAnnouncement={handleDeleteAnnouncement}
-                          isLoggedIn={isAdmin || isCoach} 
+                          isLoggedIn={isAdmin} 
                           password={adminPass}
                           onPasswordChange={setAdminPass}
                           onLogin={handleAdminLogin}
                           loginError={loginError}
                           onAutoAllocate={autoAllocateDuties}
                           onClearDuties={clearAllDuties}
-                          onAddGame={addGame}
                           onClearSchedule={clearSchedule}
                           onDeleteGame={deleteGame}
                           adminActionStatus={adminActionStatus}
@@ -1944,13 +1811,6 @@ export default function App() {
                           onDeleteDutyConfig={handleDeleteDutyConfig}
                           onUpdateAnnouncement={handleUpdateAnnouncement}
                           availabilities={availabilities}
-                          squadPlayers={squadPlayers}
-                          squadPasswords={squadPasswords}
-                          onAddSquadPlayer={addSquadPlayer}
-                          onUpdateSquadPlayer={updateSquadPlayer}
-                          onDeleteSquadPlayer={deleteSquadPlayer}
-                          isCoach={isCoach}
-                          onUpdateCoachPassword={updateCoachPassword}
                         />
                   </div>
                 )}
@@ -1961,12 +1821,12 @@ export default function App() {
           {/* Bottom Nav (Hidden on Desktop) */}
           <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
             <NavButton active={view === 'fixtures' || view === 'game'} onClick={() => setView('fixtures')} icon={<Calendar className="w-6 h-6" />} />
-            <NavButton active={view === 'duties'} onClick={() => setView('duties')} icon={<Shield className="w-6 h-6" />} badge={totalDutySwaps} />
+            <NavButton active={view === 'duties'} onClick={() => setView('duties')} icon={<Shield className="w-6 h-6" />} />
             {messagingEnabled && (
               <NavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-6 h-6" />} badge={totalUnreadMessages} />
             )}
             <NavButton active={view === 'squad'} onClick={() => setView('squad')} icon={<Users className="w-6 h-6" />} />
-            {(isAdmin || isCoach) && <NavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-6 h-6" />} />}
+            {isAdmin && <NavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-6 h-6" />} />}
           </nav>
         </div>
       </div>
@@ -2056,8 +1916,8 @@ function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availab
   
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
     { id: 'goalie', label: 'Goalie' },
-    { id: 'snack_provider', label: 'Snack' },
-    { id: 'pitch_marshal', label: 'Marshal' },
+    { id: 'snackProvider', label: 'Snack' },
+    { id: 'pitchMarshal', label: 'Marshal' },
     { id: 'referee', label: 'Referee' }
   ]).filter((d: any) => {
     if (d.applicableTo === 'both') return true;
@@ -2067,26 +1927,21 @@ function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availab
     return false;
   });
 
-  const getAssignee = (d: any) =>
-    (game.assignments && game.assignments[d.id]) ||
-    (d.id === 'goalie' ? game.goalie :
-     d.id === 'snack_provider' ? game.snackProvider :
-     d.id === 'pitch_marshal' ? game.pitchMarshal :
-     d.id === 'referee' ? game.referee : null);
+  const isMissingDuties = applicableDuties.some(d => {
+    const assignee = (game.assignments && game.assignments[d.id]) || (d.id === 'goalie' ? game.goalie : d.id === 'snackProvider' ? game.snackProvider : d.id === 'pitchMarshal' ? game.pitchMarshal : d.id === 'referee' ? game.referee : null);
+    return !assignee;
+  });
 
-  const isMissingDuties = applicableDuties.some(d => !getAssignee(d));
+  const isSwapPending = applicableDuties.some(d => {
+    return (game.swapRequests && game.swapRequests[d.id]) || (d.id === 'goalie' ? game.goalieSwapRequested : d.id === 'snackProvider' ? game.snackSwapRequested : d.id === 'pitchMarshal' ? game.marshalSwapRequested : d.id === 'referee' ? game.refereeSwapRequested : false);
+  });
+  
+  const hasNotes = feedbacks.some((f: any) => f.gameId === game.id);
 
-  const isSwapPending = applicableDuties.some(d =>
-    (game.swapRequests && game.swapRequests[d.id]) ||
-    (d.id === 'goalie' ? game.goalieSwapRequested :
-     d.id === 'snack_provider' ? game.snackSwapRequested :
-     d.id === 'pitch_marshal' ? game.marshalSwapRequested :
-     d.id === 'referee' ? game.refereeSwapRequested : false)
-  );
-
-  const hasNotes = feedbacks.some((f: any) => (f.feedback || f.goals));
-
-  const myDutyObj = applicableDuties.find(d => getAssignee(d) === userName);
+  const myDutyObj = applicableDuties.find(d => {
+    const assignee = (game.assignments && game.assignments[d.id]) || (d.id === 'goalie' ? game.goalie : d.id === 'snackProvider' ? game.snackProvider : d.id === 'pitchMarshal' ? game.pitchMarshal : d.id === 'referee' ? game.referee : null);
+    return assignee === userName;
+  });
   const myDuty = myDutyObj?.label || null;
 
   const dutyIcon = myDutyObj?.id === 'snack_provider' ? <Utensils className="w-3 h-3" /> :
@@ -2137,16 +1992,10 @@ function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availab
 
           <div className="space-y-1">
             <p className="text-xl font-black text-emjsc-navy leading-none uppercase italic truncate">Vs {game.opponent}</p>
-            <a
-              href={game.mapUrlOverride || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 hover:text-emjsc-navy transition-colors"
-              onClick={e => e.stopPropagation()}
-            >
+            <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-emjsc-red shrink-0" />
-              <p className="text-[10px] text-slate-500 font-bold uppercase truncate tracking-tight hover:underline">{game.location}</p>
-            </a>
+              <p className="text-[10px] text-slate-500 font-bold uppercase truncate tracking-tight">{game.location}</p>
+            </div>
           </div>
         </div>
 
@@ -2195,7 +2044,7 @@ function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSignUp, o
     return false;
   });
 
-  const playerFeedback = feedbacks.find((f: any) => f.playerName === user.displayName);
+  const playerFeedback = feedbacks.find((f: any) => f.gameId === game.id && f.playerName === user.displayName);
 
   return (
     <motion.div 
@@ -2234,7 +2083,7 @@ function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSignUp, o
             <p className="text-emjsc-navy text-xs font-black uppercase tracking-widest flex items-center gap-2">
               <MapPin className="w-4 h-4 text-emjsc-red" />
               <a 
-                href={game.mapUrlOverride || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
+                href={game.mapUrlOverride || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(game.location)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline"
@@ -2251,7 +2100,7 @@ function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSignUp, o
               <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 mb-2 flex items-center gap-2">
                   <Flag className="w-4 h-4" />
-                  Your Goals
+                  Your Match Goals
                 </h4>
                 <p className="text-xs font-bold text-slate-700 leading-relaxed uppercase tracking-tight">
                   {playerFeedback.goals}
@@ -2523,160 +2372,209 @@ function DutyCell({ assignedTo, onSignUp, isMe, swapRequested, isSyncing, userUn
   );
 }
 
-function AdminCommunications({
-  feedbacks = [],
+function AdminCommunications({ 
+  games = [], 
+  feedbacks = [], 
   announcements = [],
   onUpdateFeedback,
   onAddAnnouncement,
-  onDeleteAnnouncement,
-  squadPlayers = []
+  onDeleteAnnouncement
 }: any) {
+  const [selectedGameId, setSelectedGameId] = useState(games[0]?.id || '');
   const [bulkFeedback, setBulkFeedback] = useState<any>({});
   const [status, setStatus] = useState<string | null>(null);
+  
   const [newAnnContent, setNewAnnContent] = useState('');
   const [newAnnType, setNewAnnType] = useState<'message' | 'goal'>('message');
 
-  // Initialise local state from Firestore feedbacks whenever they change
+  const selectedGame = games.find((g: any) => g.id === selectedGameId);
+
   useEffect(() => {
-    const newBulk: any = {};
-    squadPlayers.forEach((player: any) => {
-      const existing = feedbacks.find((f: any) => f.playerName === player.name);
-      newBulk[player.name] = {
-        goals: existing?.goals || '',
-        feedback: existing?.feedback || ''
-      };
-    });
-    setBulkFeedback(newBulk);
-  }, [feedbacks, squadPlayers]);
+    if (!selectedGameId && games.length > 0) {
+      setSelectedGameId(games[0].id);
+    }
+  }, [games, selectedGameId]);
+
+  useEffect(() => {
+    if (selectedGame) {
+      const newBulk: any = {};
+      TEAM_SQUAD.forEach(player => {
+        const existing = feedbacks.find((f: any) => f.gameId === selectedGameId && f.playerName === player.name);
+        newBulk[player.name] = {
+          goals: existing?.goals || '',
+          feedback: existing?.feedback || ''
+        };
+      });
+      setBulkFeedback(newBulk);
+    }
+  }, [selectedGameId]); 
 
   const handleUpdateBulk = (playerName: string, field: 'goals' | 'feedback', value: string) => {
     setBulkFeedback((prev: any) => ({
       ...prev,
-      [playerName]: { ...prev[playerName], [field]: value }
+      [playerName]: {
+        ...prev[playerName],
+        [field]: value
+      }
     }));
   };
 
   const handleSaveAll = async () => {
-    setStatus('Saving...');
-    await Promise.all(
-      squadPlayers.map((player: any) => {
-        const data = bulkFeedback[player.name] || { feedback: '', goals: '' };
-        return onUpdateFeedback(player.name, data.feedback, data.goals);
-      })
-    );
-    setStatus('Saved!');
+    if (!selectedGameId) return;
+    setStatus('Saving everything...');
+    
+    // Save all player feedack
+    const promises = TEAM_SQUAD.map(player => {
+      const data = bulkFeedback[player.name];
+      return onUpdateFeedback(selectedGameId, player.name, data.feedback, data.goals);
+    });
+    
+    await Promise.all(promises);
+    
+    setStatus('All Communications Saved!');
     setTimeout(() => setStatus(null), 2000);
   };
 
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6 overflow-hidden">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Coaches Communications</h3>
-        {status && <span className="text-[9px] font-black uppercase text-emjsc-red animate-pulse">{status}</span>}
-      </div>
+       <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Coaches Communications</h3>
+          {status && <span className="text-[9px] font-black uppercase text-emjsc-red animate-pulse">{status}</span>}
+       </div>
 
-      <div className="space-y-6">
-        {/* Team announcements */}
-        <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-emjsc-navy">Team Messages & Goals</h4>
-          <div className="space-y-3">
-            <textarea
-              value={newAnnContent}
-              onChange={(e) => setNewAnnContent(e.target.value)}
-              placeholder="Post a general team message or collective goal..."
-              className="w-full h-20 p-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none"
-            />
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setNewAnnType('message')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${newAnnType === 'message' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
-                >Message</button>
-                <button
-                  onClick={() => setNewAnnType('goal')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${newAnnType === 'goal' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
-                >Goal</button>
+       <div className="space-y-6">
+         <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4">
+           <h4 className="text-[10px] font-black uppercase tracking-widest text-emjsc-navy">Team Messages & Goals (Not Tied to Match)</h4>
+           <div className="space-y-3">
+             <textarea 
+               value={newAnnContent}
+               onChange={(e) => setNewAnnContent(e.target.value)}
+               placeholder="Post a general team message or collective goal..."
+               className="w-full h-20 p-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none"
+             />
+             <div className="flex items-center gap-2">
+               <div className="flex items-center gap-1">
+                 <button 
+                   onClick={() => setNewAnnType('message')}
+                   className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${newAnnType === 'message' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
+                 >
+                   Message
+                 </button>
+                 <button 
+                   onClick={() => setNewAnnType('goal')}
+                   className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${newAnnType === 'goal' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
+                 >
+                   Goal
+                 </button>
+               </div>
+               <div className="flex-1" />
+               <button 
+                 onClick={() => {
+                   if (!newAnnContent.trim()) return;
+                   onAddAnnouncement(newAnnContent.trim(), newAnnType);
+                   setNewAnnContent('');
+                 }}
+                 className="bg-emjsc-navy text-white text-[9px] font-black uppercase px-4 py-2 rounded-xl shadow-md active:scale-95 flex items-center gap-2"
+               >
+                 <Plus className="w-3 h-3" />
+                 Post Global
+               </button>
+             </div>
+           </div>
+
+           {announcements && announcements.length > 0 && (
+             <div className="pt-4 border-t border-slate-100 space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+               {announcements.map((ann: any) => (
+                 <div key={ann.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm group">
+                   <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${ann.type === 'goal' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
+                   <div className="flex-1 min-w-0">
+                     <p className="text-[10px] font-bold text-slate-700 leading-tight line-clamp-1 italic uppercase tracking-tighter">"{ann.content}"</p>
+                     <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                       {ann.type} • {ann.timestamp?.toDate ? ann.timestamp.toDate().toLocaleDateString() : 'Just now'}
+                     </p>
+                   </div>
+                   <button 
+                     onClick={() => onDeleteAnnouncement(ann.id)}
+                     className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-emjsc-red transition-all"
+                   >
+                     <Trash2 className="w-3.5 h-3.5" />
+                   </button>
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+
+         <div className="space-y-2 max-w-xs">
+           <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Select Match</label>
+           <select 
+             value={selectedGameId}
+             onChange={(e) => setSelectedGameId(e.target.value)}
+             className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none"
+           >
+             {games.map((g: any) => (
+               <option key={g.id} value={g.id}>
+                 {new Date(g.date).toLocaleDateString()} vs {g.opponent}
+               </option>
+             ))}
+           </select>
+         </div>
+
+         <div className="space-y-4 pt-4 border-t border-slate-50">
+           <div className="space-y-2">
+             <textarea 
+             />
+           </div>
+
+           <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Player Specific Feedback</h4>
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="p-3 text-[9px] font-black uppercase text-slate-400 w-32">Player</th>
+                      <th className="p-3 text-[9px] font-black uppercase text-slate-400">Match Goals (Orange Box)</th>
+                      <th className="p-3 text-[9px] font-black uppercase text-slate-400">Private Feedback</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {TEAM_SQUAD.map(player => (
+                      <tr key={player.name} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 align-top">
+                          <p className="text-[10px] font-black text-emjsc-navy uppercase">{player.name}</p>
+                        </td>
+                        <td className="p-3 align-top">
+                          <textarea 
+                            value={bulkFeedback[player.name]?.goals || ''}
+                            onChange={(e) => handleUpdateBulk(player.name, 'goals', e.target.value)}
+                            placeholder="e.g. Focus on passing"
+                            className="w-full h-16 p-2 bg-orange-50/30 border border-orange-100 rounded-xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-orange-300 resize-none"
+                          />
+                        </td>
+                        <td className="p-3 align-top">
+                          <textarea 
+                            value={bulkFeedback[player.name]?.feedback || ''}
+                            onChange={(e) => handleUpdateBulk(player.name, 'feedback', e.target.value)}
+                            placeholder="Message to parents/player"
+                            className="w-full h-16 p-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="flex-1" />
-              <button
-                onClick={() => { if (!newAnnContent.trim()) return; onAddAnnouncement(newAnnContent.trim(), newAnnType); setNewAnnContent(''); }}
-                className="bg-emjsc-navy text-white text-[9px] font-black uppercase px-4 py-2 rounded-xl shadow-md active:scale-95 flex items-center gap-2"
-              >
-                <Plus className="w-3 h-3" />
-                Post
-              </button>
-            </div>
-          </div>
+           </div>
 
-          {announcements.length > 0 && (
-            <div className="pt-4 border-t border-slate-100 space-y-2 max-h-48 overflow-y-auto no-scrollbar">
-              {announcements.map((ann: any) => (
-                <div key={ann.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm group">
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${ann.type === 'goal' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold text-slate-700 leading-tight line-clamp-1 italic uppercase tracking-tighter">"{ann.content}"</p>
-                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                      {ann.type} • {ann.timestamp?.toDate ? ann.timestamp.toDate().toLocaleDateString() : 'Just now'}
-                    </p>
-                  </div>
-                  <button onClick={() => onDeleteAnnouncement(ann.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-emjsc-red transition-all">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Per-player feedback & goals */}
-        <div className="space-y-4">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Player Feedback & Goals</h4>
-          <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full text-left border-collapse min-w-[560px]">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="p-3 text-[9px] font-black uppercase text-slate-400 w-28">Player</th>
-                  <th className="p-3 text-[9px] font-black uppercase text-slate-400">Goals</th>
-                  <th className="p-3 text-[9px] font-black uppercase text-slate-400">Feedback</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {squadPlayers.map((player: any) => (
-                  <tr key={player.name} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-3 align-top">
-                      <p className="text-[10px] font-black text-emjsc-navy uppercase">{player.name}</p>
-                    </td>
-                    <td className="p-3 align-top">
-                      <textarea
-                        value={bulkFeedback[player.name]?.goals || ''}
-                        onChange={(e) => handleUpdateBulk(player.name, 'goals', e.target.value)}
-                        placeholder="e.g. Focus on passing"
-                        className="w-full h-16 p-2 bg-orange-50/30 border border-orange-100 rounded-xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-orange-300 resize-none"
-                      />
-                    </td>
-                    <td className="p-3 align-top">
-                      <textarea
-                        value={bulkFeedback[player.name]?.feedback || ''}
-                        onChange={(e) => handleUpdateBulk(player.name, 'feedback', e.target.value)}
-                        placeholder="Message to parents/player"
-                        className="w-full h-16 p-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <button
-            onClick={handleSaveAll}
-            className="w-full bg-emjsc-red text-white text-[11px] font-black uppercase py-4 rounded-2xl shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-          >
-            <Check className="w-4 h-4" />
-            Save All
-          </button>
-        </div>
-      </div>
+           <button 
+             onClick={handleSaveAll}
+             className="w-full bg-emjsc-red text-white text-[11px] font-black uppercase py-4 rounded-2xl shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+           >
+             <Check className="w-4 h-4" />
+             Save All Communications
+           </button>
+         </div>
+       </div>
     </div>
   );
 }
@@ -2729,93 +2627,13 @@ function AdminModeration({ messages = [], blocks = [], onAdminDeleteMessage, onA
   );
 }
 
-function AddMatchForm({ onAdd }: any) {
-  const [opponent, setOpponent] = useState('');
-  const [date, setDate] = useState('');
-  const [location, setLocation] = useState('');
-  const [isHome, setIsHome] = useState(true);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const handleAdd = async () => {
-    if (!opponent.trim() || !date || !location.trim()) return;
-    setStatus('Adding...');
-    await onAdd(opponent.trim(), date, location.trim(), isHome);
-    setStatus('Added!');
-    setOpponent(''); setDate(''); setLocation(''); setIsHome(true);
-    setTimeout(() => setStatus(null), 2000);
-  };
-
-  return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add New Match</h3>
-        {status && <span className="text-[9px] font-black uppercase text-emjsc-red animate-pulse">{status}</span>}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Opponent *</label>
-          <input
-            type="text"
-            value={opponent}
-            onChange={(e) => setOpponent(e.target.value)}
-            placeholder="e.g. Brighton United"
-            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Home / Away</label>
-          <div className="flex p-1 bg-slate-100 rounded-xl">
-            <button
-              onClick={() => setIsHome(true)}
-              className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${isHome ? 'bg-white text-emjsc-navy shadow-sm' : 'text-slate-400'}`}
-            >Home</button>
-            <button
-              onClick={() => setIsHome(false)}
-              className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${!isHome ? 'bg-white text-emjsc-navy shadow-sm' : 'text-slate-400'}`}
-            >Away</button>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Date & Kick-off Time *</label>
-          <input
-            type="datetime-local"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Venue / Location *</label>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Central Park, Malvern"
-            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-          />
-        </div>
-      </div>
-      <button
-        onClick={handleAdd}
-        disabled={!opponent.trim() || !date || !location.trim()}
-        className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl shadow-xl shadow-blue-900/10 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-      >
-        <Plus className="w-4 h-4" />
-        Add Match to Schedule
-      </button>
-    </div>
-  );
-}
-
-function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], onDeleteGame, squadPlayers = [] }: any) {
+function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], onDeleteGame }: any) {
   const [selectedGameId, setSelectedGameId] = useState(games[0]?.id || '');
   const [venue, setVenue] = useState('');
   const [date, setDate] = useState('');
   const [opponent, setOpponent] = useState('');
   const [isHome, setIsHome] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
-  const [dutyInputs, setDutyInputs] = useState<Record<string, string>>({});
-  const [dutySavedId, setDutySavedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedGameId && games.length > 0) {
@@ -2833,16 +2651,6 @@ function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], 
       setDate(selectedGame.date || '');
       setOpponent(selectedGame.opponent || '');
       setIsHome(selectedGame.isHome ?? true);
-
-      const inputs: Record<string, string> = {};
-      dutiesConfig.forEach((duty: any) => {
-        inputs[duty.id] = selectedGame.assignments?.[duty.id] ||
-          (duty.id === 'goalie' ? selectedGame.goalie :
-           duty.id === 'snack_provider' ? selectedGame.snackProvider :
-           duty.id === 'pitch_marshal' ? selectedGame.pitchMarshal :
-           duty.id === 'referee' ? selectedGame.referee : '') || '';
-      });
-      setDutyInputs(inputs);
     }
   }, [selectedGameId, selectedGame]);
 
@@ -2862,12 +2670,6 @@ function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], 
       onDeleteGame(selectedGameId);
       setSelectedGameId(games.find((g: any) => g.id !== selectedGameId)?.id || '');
     }
-  };
-
-  const saveDuty = async (dutyId: string, value: string) => {
-    await onUpdate(selectedGameId, dutyId, value);
-    setDutySavedId(dutyId);
-    setTimeout(() => setDutySavedId(null), 1500);
   };
 
   return (
@@ -2953,42 +2755,26 @@ function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], 
 
         <div className="pt-4 border-t border-slate-100 space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Manual Duty Assignments</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
             {dutiesConfig.map((duty: any) => {
               const isApplicable = duty.applicableTo === 'both' || (duty.applicableTo === 'home' && isHome) || (duty.applicableTo === 'away' && !isHome) || !duty.applicableTo;
               if (!isApplicable) return null;
-
-              const currentValue = dutyInputs[duty.id] ?? '';
-              const isSaved = dutySavedId === duty.id;
+              
+              const assignee = (selectedGame?.assignments && selectedGame.assignments[duty.id]) || (duty.id === 'goalie' ? selectedGame?.goalie : duty.id === 'snack_provider' ? selectedGame?.snackProvider : duty.id === 'pitch_marshal' ? selectedGame?.pitchMarshal : duty.id === 'referee' ? selectedGame?.referee : "");
 
               return (
                 <div key={duty.id} className="flex flex-col gap-1.5">
                   <label className="text-[9px] font-black uppercase text-slate-500 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      {duty.label}
-                      <span className={`text-[7px] px-1 py-0.5 rounded font-black ${duty.type === 'player' ? 'bg-blue-50 text-blue-400' : 'bg-purple-50 text-purple-400'}`}>
-                        {duty.type}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {selectedGame?.swapRequests?.[duty.id] && (
-                        <span className="bg-orange-100 text-orange-600 px-1 rounded-sm animate-pulse">Swap Req</span>
-                      )}
-                      {isSaved && <span className="text-emerald-500 font-black">✓</span>}
-                    </span>
+                    {duty.label}
+                    {selectedGame?.swapRequests?.[duty.id] && <span className="bg-orange-100 text-orange-600 px-1 rounded-sm animate-pulse">Swap Req</span>}
                   </label>
-
-                  <select
-                    value={currentValue}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDutyInputs(prev => ({ ...prev, [duty.id]: val }));
-                      saveDuty(duty.id, val);
-                    }}
+                  <select 
+                    value={assignee || ""}
+                    onChange={(e) => onUpdate(selectedGameId, duty.id, e.target.value)}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none"
                   >
                     <option value="">(Empty)</option>
-                    {squadPlayers.map((p: any) => (
+                    {TEAM_SQUAD.map(p => (
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
                   </select>
@@ -3027,16 +2813,15 @@ function MatchEditor({ games, onUpdate, availabilities = [], dutiesConfig = [], 
 }
 
 // DutyManager component
-function DutyManager({
-  duties = [],
-  onAdd,
-  onUpdate,
+function DutyManager({ 
+  duties = [], 
+  onAdd, 
+  onUpdate, 
   onDelete,
   coachChild,
   onUpdateCoachChild,
   coachExemptDuties = [],
-  onUpdateCoachExemptDuties,
-  squadPlayers = []
+  onUpdateCoachExemptDuties
 }: any) {
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<'player' | 'parent'>('player');
@@ -3170,7 +2955,7 @@ function DutyManager({
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
               >
                 <option value="">None Selected</option>
-                {squadPlayers.map((p: any) => (
+                {TEAM_SQUAD.map(p => (
                   <option key={p.name} value={p.name}>{p.name}</option>
                 ))}
               </select>
@@ -3214,201 +2999,8 @@ function DutyManager({
   );
 }
 
-function SquadManager({ players = [], passwords = {}, onAdd, onUpdate, onDelete }: any) {
-  const [editing, setEditing] = useState<Record<string, { name: string; fact: string; password: string }>>({});
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newFact, setNewFact] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [showPassFor, setShowPassFor] = useState<string | null>(null);
-
-  const startEdit = (p: any) => {
-    setEditing(prev => ({
-      ...prev,
-      [p.name]: { name: p.name, fact: p.fact || '', password: passwords[p.name] || '' }
-    }));
-  };
-
-  const cancelEdit = (name: string) => {
-    setEditing(prev => { const n = { ...prev }; delete n[name]; return n; });
-  };
-
-  const saveEdit = async (originalName: string) => {
-    const draft = editing[originalName];
-    if (!draft || !draft.name.trim()) return;
-    await onUpdate(originalName, { name: draft.name.trim(), fact: draft.fact.trim(), password: draft.password.trim() });
-    setSavedId(draft.name.trim());
-    setTimeout(() => setSavedId(null), 1500);
-    cancelEdit(originalName);
-  };
-
-  const handleAdd = async () => {
-    if (!newName.trim()) return;
-    await onAdd({ name: newName.trim(), fact: newFact.trim(), password: newPassword.trim() });
-    setNewName(''); setNewFact(''); setNewPassword('');
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Squad Players</h3>
-          <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-full">{players.length} Players</span>
-        </div>
-
-        <div className="space-y-3">
-          {players.map((p: any) => {
-            const draft = editing[p.name];
-            const isSaved = savedId === p.name || savedId === draft?.name;
-            return (
-              <div key={p.name} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
-                {draft ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Name</label>
-                        <input
-                          type="text"
-                          value={draft.name}
-                          onChange={(e) => setEditing(prev => ({ ...prev, [p.name]: { ...draft, name: e.target.value } }))}
-                          className="w-full p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Password</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type={showPassFor === p.name ? 'text' : 'password'}
-                            value={draft.password}
-                            onChange={(e) => setEditing(prev => ({ ...prev, [p.name]: { ...draft, password: e.target.value } }))}
-                            placeholder="Set password..."
-                            className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-                          />
-                          <button
-                            onClick={() => setShowPassFor(showPassFor === p.name ? null : p.name)}
-                            className="p-2 text-slate-400 hover:text-emjsc-navy transition-colors"
-                          >
-                            {showPassFor === p.name ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Player Fact</label>
-                      <input
-                        type="text"
-                        value={draft.fact}
-                        onChange={(e) => setEditing(prev => ({ ...prev, [p.name]: { ...draft, fact: e.target.value } }))}
-                        placeholder="e.g. Lightning fast with a great attitude"
-                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => saveEdit(p.name)}
-                        className="flex-1 bg-emjsc-navy text-white text-[9px] font-black uppercase py-2 rounded-xl active:scale-[0.98] transition-all"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => cancelEdit(p.name)}
-                        className="px-4 bg-slate-100 text-slate-500 text-[9px] font-black uppercase py-2 rounded-xl transition-all hover:bg-slate-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 bg-emjsc-navy rounded-xl flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                        {p.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-emjsc-navy uppercase truncate flex items-center gap-1.5">
-                          {p.name}
-                          {isSaved && <span className="text-emerald-500 font-black text-[10px]">✓</span>}
-                        </p>
-                        <p className="text-[9px] text-slate-400 font-bold truncate">{passwords[p.name] ? '••••••' : <span className="text-orange-400 italic">No password set</span>}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => startEdit(p)}
-                        className="p-2 text-slate-400 hover:text-emjsc-navy transition-colors"
-                        title="Edit"
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Remove ${p.name} from the squad?`)) onDelete(p.name);
-                        }}
-                        className="p-2 text-slate-400 hover:text-emjsc-red transition-colors"
-                        title="Remove"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add Player</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Name *</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Alex T"
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Password</label>
-              <input
-                type="text"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="e.g. ROCKET2026"
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Player Fact</label>
-            <input
-              type="text"
-              value={newFact}
-              onChange={(e) => setNewFact(e.target.value)}
-              placeholder="e.g. Always first to training with a smile"
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-            />
-          </div>
-          <button
-            onClick={handleAdd}
-            disabled={!newName.trim()}
-            className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl shadow-xl shadow-blue-900/10 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add to Squad
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminView({
-  games,
+function AdminView({ 
+  games, 
   isLoggedIn, 
   password, 
   onPasswordChange, 
@@ -3427,7 +3019,6 @@ function AdminView({
   onRefreshTravelTimes,
   onBulkSync,
   onSyncDribl,
-  onAddGame,
   onClearSchedule,
   onDeleteGame,
   coachChild,
@@ -3450,21 +3041,10 @@ function AdminView({
   dutiesConfig,
   onUpdateDutyConfig,
   onAddDutyConfig,
-  onDeleteDutyConfig,
-  squadPlayers = [],
-  squadPasswords = {},
-  onAddSquadPlayer,
-  onUpdateSquadPlayer,
-  onDeleteSquadPlayer,
-  isCoach = false,
-  onUpdateCoachPassword
+  onDeleteDutyConfig
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
-  const [activeTab, setActiveTab] = useState(isCoach ? 'coach' : 'coach');
-  const [driblToken, setDriblToken] = useState('');
-  const [showDriblToken, setShowDriblToken] = useState(false);
-  const [newCoachPass, setNewCoachPass] = useState('');
-  const [showNewCoachPass, setShowNewCoachPass] = useState(false);
+  const [activeTab, setActiveTab] = useState('ops'); // ops, content, matches, moderate, settings, duties
   
   if (!isLoggedIn) {
     return (
@@ -3503,21 +3083,20 @@ function AdminView({
     );
   }
 
-  const allTabs = [
-    { id: 'coach', label: 'Coach', icon: <Flag className="w-3 h-3" /> },
+  const tabs = [
+    { id: 'ops', label: 'Dashboard', icon: <Zap className="w-3 h-3" /> },
+    { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
     { id: 'matches', label: 'Match Day', icon: <Calendar className="w-3 h-3" /> },
     ...(messagingEnabled ? [{ id: 'moderate', label: 'Moderation', icon: <Shield className="w-3 h-3" /> }] : []),
     { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
-    { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-3 h-3" /> },
   ];
-  const tabs = isCoach ? allTabs.filter(t => t.id === 'coach') : allTabs;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-black tracking-tight text-emjsc-navy uppercase">{isCoach ? 'Coach Hub' : 'Admin Hub'}</h2>
+          <h2 className="text-2xl font-black tracking-tight text-emjsc-navy uppercase">Admin Hub</h2>
           <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
             <div className={`w-2 h-2 rounded-full ${trainingCancelled ? 'bg-emjsc-red animate-pulse' : 'bg-green-500'}`} />
             <span className="text-[8px] font-black uppercase text-slate-500">{trainingCancelled ? 'Closed' : 'Open'}</span>
@@ -3558,15 +3137,36 @@ function AdminView({
       )}
 
       <AnimatePresence mode="wait">
-        {activeTab === 'coach' && (
-          <motion.div
-            key="coach"
+        {activeTab === 'ops' && (
+          <motion.div 
+            key="ops"
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             className="space-y-6"
           >
-            {/* Match Day Operations */}
+            <div className="bg-emjsc-navy p-7 rounded-[2.5rem] text-white space-y-6 shadow-xl border-b-8 border-emjsc-red relative overflow-hidden">
+               <div className="relative z-10">
+                 <div className="flex items-center justify-between">
+                   <h3 className="text-xl font-black uppercase flex items-center gap-2">
+                     Quick Actions
+                   </h3>
+                   <Zap className="w-5 h-5 text-yellow-400 animate-pulse" />
+                 </div>
+                 
+                 <div className="grid grid-cols-1 gap-3 mt-6">
+                   <button 
+                     onClick={onRefreshTravelTimes}
+                     className="w-full bg-white/10 text-white border border-white/20 font-black py-4 rounded-2xl uppercase tracking-[0.1em] text-[10px] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                   >
+                     <RefreshCw className="w-4 h-4" />
+                     Sync Travel Times
+                   </button>
+                 </div>
+               </div>
+               <Zap className="absolute -bottom-6 -right-6 w-32 h-32 text-white/5 rotate-12" />
+            </div>
+
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Match Day Operations</h3>
               <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
@@ -3574,23 +3174,35 @@ function AdminView({
                   <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none">Training Status</p>
                   <p className="text-[8px] text-slate-400 font-bold uppercase">{trainingCancelled ? 'Currently closed' : 'Scheduled as normal'}</p>
                 </div>
-                <button
+                <button 
                   onClick={() => onToggleTraining(!trainingCancelled)}
-                  className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md ${trainingCancelled ? 'bg-green-500 text-white' : 'bg-emjsc-red text-white'}`}
+                  className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md ${
+                    trainingCancelled 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-emjsc-red text-white'
+                  }`}
                 >
                   {trainingCancelled ? 'Open' : 'Cancel'}
                 </button>
               </div>
             </div>
+          </motion.div>
+        )}
 
-            {/* Player feedback & announcements */}
-            <AdminCommunications
-              feedbacks={feedbacks}
+        {activeTab === 'content' && (
+          <motion.div 
+            key="content"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+          >
+            <AdminCommunications 
+              games={games} 
+              feedbacks={feedbacks} 
               announcements={announcements}
-              onUpdateFeedback={onUpdateFeedback}
+              onUpdateFeedback={onUpdateFeedback} 
               onAddAnnouncement={onAddAnnouncement}
               onDeleteAnnouncement={onDeleteAnnouncement}
-              squadPlayers={squadPlayers}
             />
           </motion.div>
         )}
@@ -3603,75 +3215,43 @@ function AdminView({
             exit={{ opacity: 0, x: -10 }}
             className="space-y-6"
           >
-            <AddMatchForm onAdd={onAddGame} />
-            <button
-              onClick={onRefreshTravelTimes}
-              className="w-full bg-white text-emjsc-navy border border-slate-200 font-black py-4 rounded-2xl uppercase tracking-[0.1em] text-[10px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Sync Travel Times
-            </button>
-            <MatchEditor
+            <MatchEditor 
               games={games}
               onUpdate={onManualAssign}
               availabilities={availabilities}
               dutiesConfig={dutiesConfig}
               onDeleteGame={onDeleteGame}
-              squadPlayers={squadPlayers}
             />
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fixture Integration</h3>
-                <div className="bg-slate-100 px-2 py-1 rounded text-[8px] font-bold text-slate-400">DRIBL API</div>
-              </div>
-
-              {/* Dribl token + sync */}
-              <div className="space-y-2">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Dribl Auth Token (optional)</p>
-                <p className="text-[9px] text-slate-400 leading-snug">
-                  If Sync fails (403), open the Dribl app → network inspector or use a proxy tool to copy your Bearer token, then paste it here.
-                </p>
                 <div className="flex gap-2">
-                  <input
-                    type={showDriblToken ? 'text' : 'password'}
-                    value={driblToken}
-                    onChange={(e) => setDriblToken(e.target.value)}
-                    placeholder="eyJ..."
-                    className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-mono outline-none focus:ring-1 focus:ring-emjsc-navy"
-                  />
-                  <button
-                    onClick={() => setShowDriblToken(v => !v)}
-                    className="px-3 py-2 bg-slate-100 rounded-xl text-[9px] font-black uppercase text-slate-500"
+                  <button 
+                    onClick={onSyncDribl}
+                    className="bg-emjsc-red text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-lg border border-emjsc-red hover:bg-emjsc-red/90 transition-colors flex items-center gap-1.5"
                   >
-                    {showDriblToken ? 'Hide' : 'Show'}
+                    <Download className="w-3 h-3" />
+                    Sync Dribl
                   </button>
+                  <div className="bg-slate-100 px-2 py-1 rounded text-[8px] font-bold text-slate-400">DRIBL API</div>
                 </div>
-                <button
-                  onClick={() => onSyncDribl(driblToken || undefined)}
-                  className="w-full bg-emjsc-red text-white text-[10px] font-black uppercase py-3 rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Sync Dribl Fixtures
-                </button>
               </div>
-
-              <div className="border-t border-slate-100 pt-4 space-y-4">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Manual JSON Import</p>
-                <textarea
+              <div className="space-y-4">
+                <textarea 
                   value={bulkJson}
                   onChange={(e) => setBulkJson(e.target.value)}
                   placeholder='Paste PlayFootball JSON here...'
                   className="w-full h-40 p-5 bg-slate-50 border border-slate-100 rounded-3xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none font-mono"
                 />
-                <button
+                <button 
                   onClick={() => { onBulkSync(bulkJson); setBulkJson(''); }}
                   className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Sync New Fixtures
                 </button>
-
-                <button
+                
+                <button 
                   onClick={() => {
                     if (window.confirm("CRITICAL WARNING: This will PERMANENTLY DELETE the entire match schedule from the database. This cannot be undone. Proceed?")) {
                       onClearSchedule();
@@ -3748,7 +3328,7 @@ function AdminView({
                <Zap className="absolute -bottom-6 -right-6 w-32 h-32 text-white/5 rotate-12 opacity-10" />
             </div>
 
-            <DutyManager
+            <DutyManager 
               duties={dutiesConfig}
               onAdd={onAddDutyConfig}
               onUpdate={onUpdateDutyConfig}
@@ -3757,7 +3337,6 @@ function AdminView({
               onUpdateCoachChild={onUpdateCoachChild}
               coachExemptDuties={coachExemptDuties}
               onUpdateCoachExemptDuties={onUpdateCoachExemptDuties}
-              squadPlayers={squadPlayers}
             />
 
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
@@ -3776,7 +3355,7 @@ function AdminView({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {squadPlayers.map((player: any) => {
+                    {TEAM_SQUAD.map(player => {
                       const counts: Record<string, number> = {};
                       dutiesConfig.forEach(d => counts[d.id] = 0);
                       
@@ -3837,24 +3416,6 @@ function AdminView({
           </motion.div>
         )}
 
-        {activeTab === 'squad' && (
-          <motion.div
-            key="squad"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            className="space-y-6"
-          >
-            <SquadManager
-              players={squadPlayers}
-              passwords={squadPasswords}
-              onAdd={onAddSquadPlayer}
-              onUpdate={onUpdateSquadPlayer}
-              onDelete={onDeleteSquadPlayer}
-            />
-          </motion.div>
-        )}
-
         {activeTab === 'settings' && (
           <motion.div 
             key="settings"
@@ -3902,41 +3463,16 @@ function AdminView({
                       <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none">Internal Chat</p>
                       <p className="text-[8px] text-slate-400 font-bold uppercase">{messagingEnabled ? 'Enabled for all players' : 'Globally Disabled'}</p>
                     </div>
-                    <button
+                    <button 
                       onClick={() => onUpdateMessagingEnabled(!messagingEnabled)}
-                      className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${messagingEnabled ? 'bg-emjsc-red text-white' : 'bg-green-600 text-white'}`}
+                      className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                        messagingEnabled ? 'bg-emjsc-red text-white' : 'bg-green-600 text-white'
+                      }`}
                     >
                       {messagingEnabled ? 'Disable' : 'Enable'}
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-50 space-y-3">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 flex items-center gap-2">
-                  <Flag className="w-3 h-3" />
-                  Coach Login Password
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type={showNewCoachPass ? 'text' : 'password'}
-                    value={newCoachPass}
-                    onChange={e => setNewCoachPass(e.target.value)}
-                    placeholder="Set coach password..."
-                    className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
-                  />
-                  <button onClick={() => setShowNewCoachPass(v => !v)} className="px-3 bg-slate-100 rounded-xl text-[9px] font-black uppercase text-slate-500">
-                    {showNewCoachPass ? 'Hide' : 'Show'}
-                  </button>
-                  <button
-                    onClick={() => { if (newCoachPass.trim()) { onUpdateCoachPassword(newCoachPass.trim()); setNewCoachPass(''); } }}
-                    disabled={!newCoachPass.trim()}
-                    className="px-4 bg-emjsc-navy text-white rounded-xl text-[9px] font-black uppercase disabled:opacity-40"
-                  >
-                    Save
-                  </button>
-                </div>
-                <p className="text-[8px] text-slate-400 italic px-1">Default is <span className="font-black">coach123</span> if not set.</p>
               </div>
             </div>
           </motion.div>
@@ -3946,17 +3482,17 @@ function AdminView({
   );
 }
 
-function AdminDutySelector({ label, value, onSelect, squadPlayers = [] }: any) {
+function AdminDutySelector({ label, value, onSelect }: any) {
   return (
     <div className="flex items-center justify-between gap-4 py-2 border-b border-slate-50">
       <span className="text-[10px] font-black uppercase text-slate-400">{label}</span>
-      <select
-        value={value || ""}
+      <select 
+        value={value || ""} 
         onChange={(e) => onSelect(e.target.value)}
         className="text-[10px] font-black text-emjsc-navy uppercase bg-slate-50 p-2 rounded-lg border-none focus:ring-1 focus:ring-emjsc-navy outline-none"
       >
         <option value="">(Empty)</option>
-        {squadPlayers.map((p: any) => (
+        {TEAM_SQUAD.map(p => (
           <option key={p.name} value={p.name}>{p.name}</option>
         ))}
       </select>
@@ -3964,19 +3500,21 @@ function AdminDutySelector({ label, value, onSelect, squadPlayers = [] }: any) {
   );
 }
 
-function ProfileView({ userName, profiles, feedbacks, onUpdateProfile, squadPasswords = {}, onUpdatePassword }: any) {
+function ProfileView({ userName, profiles, feedbacks, games, onUpdateProfile }: any) {
   const profile = profiles[userName] || {};
   const [skills, setSkills] = useState(profile.skills || '');
   const [isSaving, setIsSaving] = useState(false);
-  const [currentPass, setCurrentPass] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [passError, setPassError] = useState<string | null>(null);
-  const [passSaved, setPassSaved] = useState(false);
-  const [showPassFields, setShowPassFields] = useState(false);
 
+  // Automatically generate a soccer-themed profile picture based on the username
   const photoUrl = `https://picsum.photos/seed/${userName.replace(/\s+/g, '_')}_soccer/400`;
-  const myFeedback = feedbacks.find((f: any) => f.playerName === userName);
+
+  const myFeedbacks = feedbacks
+    .filter((f: any) => f.playerName === userName)
+    .sort((a: any, b: any) => {
+      const gA = games.find((g: any) => g.id === a.gameId);
+      const gB = games.find((g: any) => g.id === b.gameId);
+      return new Date(gB?.date || 0).getTime() - new Date(gA?.date || 0).getTime();
+    });
 
   useEffect(() => {
     if (profile.skills) setSkills(profile.skills);
@@ -3986,19 +3524,6 @@ function ProfileView({ userName, profiles, feedbacks, onUpdateProfile, squadPass
     setIsSaving(true);
     await onUpdateProfile(skills, photoUrl);
     setIsSaving(false);
-  };
-
-  const handleChangePassword = async () => {
-    setPassError(null);
-    const existing = squadPasswords[userName] || 'EMJSC2026';
-    if (currentPass !== existing) { setPassError('Current password is incorrect'); return; }
-    if (newPass.length < 4) { setPassError('New password must be at least 4 characters'); return; }
-    if (newPass !== confirmPass) { setPassError('Passwords do not match'); return; }
-    await onUpdatePassword(userName, newPass);
-    setCurrentPass(''); setNewPass(''); setConfirmPass('');
-    setPassSaved(true);
-    setShowPassFields(false);
-    setTimeout(() => setPassSaved(false), 3000);
   };
 
   return (
@@ -4032,7 +3557,7 @@ function ProfileView({ userName, profiles, feedbacks, onUpdateProfile, squadPass
             />
           </div>
 
-          <button
+          <button 
             onClick={handleSave}
             disabled={isSaving}
             className="w-full bg-emjsc-navy text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-900/10 active:scale-95 transition-all hover:bg-emjsc-red disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
@@ -4041,81 +3566,40 @@ function ProfileView({ userName, profiles, feedbacks, onUpdateProfile, squadPass
             {isSaving ? 'Saving Changes...' : 'Update Player Profile'}
           </button>
         </div>
-
-        {/* Password change */}
-        <div className="border-t border-slate-100 pt-6 space-y-3">
-          <button
-            onClick={() => { setShowPassFields(v => !v); setPassError(null); }}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Change Password</span>
-            <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showPassFields ? 'rotate-90' : ''}`} />
-          </button>
-
-          {showPassFields && (
-            <div className="space-y-3 pt-1">
-              {passError && (
-                <div className="bg-red-50 text-red-600 text-[10px] font-black uppercase px-3 py-2 rounded-xl border border-red-100 flex items-center gap-2">
-                  <AlertCircle className="w-3 h-3 shrink-0" />
-                  {passError}
-                </div>
-              )}
-              {passSaved && (
-                <div className="bg-green-50 text-green-700 text-[10px] font-black uppercase px-3 py-2 rounded-xl border border-green-100">
-                  Password updated!
-                </div>
-              )}
-              <input
-                type="password"
-                placeholder="Current password"
-                value={currentPass}
-                onChange={e => setCurrentPass(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-emjsc-navy"
-              />
-              <input
-                type="password"
-                placeholder="New password"
-                value={newPass}
-                onChange={e => setNewPass(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-emjsc-navy"
-              />
-              <input
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPass}
-                onChange={e => setConfirmPass(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-emjsc-navy"
-              />
-              <button
-                onClick={handleChangePassword}
-                className="w-full bg-emjsc-red text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest active:scale-95 transition-all"
-              >
-                Save New Password
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
-      {myFeedback && (myFeedback.goals || myFeedback.feedback) && (
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-xl shadow-slate-200/50 space-y-4">
-          <h3 className="text-[10px] font-black text-emjsc-navy uppercase tracking-[0.2em] flex items-center gap-2">
-            <Shield className="w-4 h-4 text-emjsc-red" />
-            Coach Feedback
+      {myFeedbacks.length > 0 && (
+        <div className="space-y-6">
+          <h3 className="text-lg font-black text-emjsc-navy uppercase tracking-tight flex items-center gap-2">
+            <Shield className="w-5 h-5 text-emjsc-red" />
+            Coach Feedback History
           </h3>
-          {myFeedback.goals && (
-            <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-1">
-              <p className="text-[9px] font-black uppercase text-orange-600 tracking-wider">Goals</p>
-              <p className="text-xs font-bold text-slate-700 uppercase tracking-tight leading-relaxed">{myFeedback.goals}</p>
-            </div>
-          )}
-          {myFeedback.feedback && (
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <p className="text-[9px] font-black uppercase text-emjsc-navy tracking-wider">Feedback</p>
-              <p className="text-xs font-bold text-slate-600 italic uppercase tracking-tight leading-relaxed">"{myFeedback.feedback}"</p>
-            </div>
-          )}
+          <div className="space-y-4">
+            {myFeedbacks.map((f: any) => {
+              const game = games.find((g: any) => g.id === f.gameId);
+              return (
+                <div key={f.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                       {game ? `vs ${game.opponent} • ${new Date(game.date).toLocaleDateString()}` : 'Past Match'}
+                    </p>
+                  </div>
+                  {f.goals && (
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase text-orange-600 tracking-wider">Coach's Goals:</p>
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-tight">{f.goals}</p>
+                    </div>
+                  )}
+                  {f.feedback && (
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase text-emjsc-navy tracking-wider">Performance Feedback:</p>
+                      <p className="text-xs font-bold text-slate-600 italic uppercase tracking-tight leading-relaxed">"{f.feedback}"</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -88,12 +88,6 @@ export interface DutyConfig {
   applicableTo: 'home' | 'away' | 'both';
 }
 
-export interface SquadPlayer {
-  name: string;
-  fact: string;
-  password?: string;
-}
-
 export interface AppUser {
   displayName: string;
 }
