@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Pillar 2: Validation Blueprints
+    function isValidGame(data) {
+      return data.size() >= 4 && data.size() <= 40
+        && data.date is string && data.date.size() <= 100
+        && data.opponent is string && data.opponent.size() <= 100
+        && data.location is string && data.location.size() <= 1000
+        && data.isHome is bool
+        && (!('mapUrlOverride' in data) || (data.mapUrlOverride is string && data.mapUrlOverride.size() <= 1000))
+        && (!('snackProvider' in data) || (data.snackProvider is string && data.snackProvider.size() <= 100))
+        && (!('pitchMarshal' in data) || (data.pitchMarshal is string && data.pitchMarshal.size() <= 100))
+        && (!('referee' in data) || (data.referee is string && data.referee.size() <= 100))
+        && (!('goalie' in data) || (data.goalie is string && data.goalie.size() <= 100))
+        && (!('snackSwapRequested' in data) || (data.snackSwapRequested is bool))
+        && (!('marshalSwapRequested' in data) || (data.marshalSwapRequested is bool))
+        && (!('refereeSwapRequested' in data) || (data.refereeSwapRequested is bool))
+        && (!('goalieSwapRequested' in data) || (data.goalieSwapRequested is bool))
+        && (!('assignments' in data) || (data.assignments is map))
+        && (!('swapRequests' in data) || (data.swapRequests is map))
+        && (!('matchWrap' in data) || (data.matchWrap is string && data.matchWrap.size() <= 5000))
+        && (!('kickOff' in data) || (data.kickOff is string && data.kickOff.size() <= 20))
+        && (!('travelTimeMinutes' in data) || (data.travelTimeMinutes is number))
+        && (data.keys().hasAll(['date', 'opponent', 'location', 'isHome']));
+    }
+
+    function isValidFeedback(data) {
+      return data.size() >= 4 && data.size() <= 10
+        && data.gameId is string && data.gameId.size() <= 100
+        && data.playerName is string && data.playerName.size() <= 100
+        && (!('feedback' in data) || (data.feedback is string && data.feedback.size() <= 5000))
+        && (!('goals' in data) || (data.goals is string && data.goals.size() <= 5000))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.size() >= 4 && data.size() <= 10
+        && data.sender is string && data.sender.size() <= 100
+        && data.receiver is string && data.receiver.size() <= 100
+        && data.content is string && data.content.size() <= 5000
+        && data.timestamp is timestamp;
+    }
+
+    function isValidBlock(data) {
+      return data.size() >= 3 && data.size() <= 10
+        && data.blocker is string && data.blocker.size() <= 100
+        && data.blocked is string && data.blocked.size() <= 100
+        && data.timestamp is timestamp;
+    }
+
+    function isValidProfile(data) {
+      return data.size() <= 10
+        && (!('skills' in data) || (data.skills is string && data.skills.size() <= 2000))
+        && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 1000))
+        && (!('updatedAt' in data) || (data.updatedAt is timestamp));
+    }
+
+    function isValidSettings(data) {
+      return data.size() <= 15
+        && (!('trainingCancelled' in data) || (data.trainingCancelled is bool))
+        && (!('trainingLocation' in data) || (data.trainingLocation is string && data.trainingLocation.size() <= 1000))
+        && (!('homeGround' in data) || (data.homeGround is string && data.homeGround.size() <= 1000))
+        && (!('coachChild' in data) || (data.coachChild is string || data.coachChild == null))
+        && (!('coachExemptDuties' in data) || (data.coachExemptDuties is list))
+        && (!('messagingEnabled' in data) || (data.messagingEnabled is bool));
+    }
+
+    function isValidAnnouncement(data) {
+      return data.size() >= 3 && data.size() <= 10
+        && data.content is string && data.content.size() <= 5000
+        && data.type in ['message', 'goal']
+        && data.timestamp is timestamp;
+    }
+
+    function isValidAvailability(data) {
+      return data.size() >= 4 && data.size() <= 10
+        && data.playerName is string && data.playerName.size() <= 100
+        && data.dateKey is string && data.dateKey.size() <= 20
+        && data.isUnavailable is bool
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDutyConfig(data) {
+      return data.size() == 6
+        && data.id is string && data.id.size() <= 100
+        && data.label is string && data.label.size() <= 100
+        && data.type in ['player', 'parent']
+        && data.maxPerWeek is number
+        && data.maxPerType is number
+        && data.applicableTo in ['home', 'away', 'both'];
+    }
+
+    // Pillar 3: Path Variable Hardening
+    match /games/{gameId} {
+      allow read: if true;
+      allow create: if isValidId(gameId) && isValidGame(incoming());
+      allow update: if isValidId(gameId) && isValidGame(incoming());
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow write: if isValidId(feedbackId) && isValidFeedback(incoming());
+    }
+
+    match /messages/{messageId} {
+      allow read: if true;
+      allow write: if isValidId(messageId) && isValidMessage(incoming());
+      allow delete: if true;
+    }
+
+    match /blocks/{blockId} {
+      allow read: if true;
+      allow write: if isValidId(blockId) && isValidBlock(incoming());
+      allow delete: if true;
+    }
+
+    match /profiles/{profileId} {      allow read: if true;
+      allow write: if isValidId(profileId) && isValidProfile(incoming());
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isValidId(settingId) && isValidSettings(incoming());
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isValidId(announcementId) && isValidAnnouncement(incoming());
+      allow delete: if true;
+    }
+
+    match /availabilities/{availabilityId} {
+      allow read: if true;
+      allow write: if isValidId(availabilityId) && isValidAvailability(incoming());
+      allow delete: if true;
+    }
+
+    match /dutiesConfig/{dutyId} {
+      allow read: if true;
+      allow create, update: if isValidId(dutyId) && isValidDutyConfig(incoming());
+      allow delete: if isValidId(dutyId);
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+  }
+}
