@@ -603,8 +603,6 @@ export default function App() {
 
   const autoAllocateDuties = async () => {
     if (!isAdmin) return;
-    if (!window.confirm("ARE YOU SURE? This will automatically assign duties for all future games and overwrite existing specific assignments. This action cannot be undone.")) return;
-    
     setAdminActionStatus('Starting Smart Allocation...');
     const batch = writeBatch(db);
     
@@ -744,8 +742,6 @@ export default function App() {
 
   const clearAllDuties = async () => {
     if (!isAdmin) return;
-    if (!window.confirm("DANGER: This will WIPE ALL assignments from ALL future games. This cannot be undone. Proceed?")) return;
-    
     setAdminActionStatus('Clearing all duties...');
     
     const batch = writeBatch(db);
@@ -1379,6 +1375,49 @@ export default function App() {
                 {view === 'fixtures' && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     <div className="lg:col-span-8 space-y-8">
+                      {(() => {
+                        const myFeedback = feedbacks.find((f: any) => f.playerName === userName);
+                        const hasPersonalNotes = myFeedback && (myFeedback.goals || myFeedback.feedback);
+                        if (!hasPersonalNotes) return null;
+                        return (
+                          <div className="space-y-4">
+                            <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Coach Notes for You</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {myFeedback.goals && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="p-5 rounded-[2rem] border-2 bg-orange-50 border-orange-100 text-orange-900 shadow-sm relative overflow-hidden group"
+                                >
+                                  <div className="relative z-10 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md bg-orange-200 text-orange-700">Your Goals</span>
+                                    </div>
+                                    <p className="text-xs font-bold leading-relaxed italic uppercase tracking-tight">{myFeedback.goals}</p>
+                                  </div>
+                                  <Flag className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.03] group-hover:scale-110 transition-transform text-orange-900" />
+                                </motion.div>
+                              )}
+                              {myFeedback.feedback && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="p-5 rounded-[2rem] border-2 bg-slate-50 border-slate-200 text-slate-900 shadow-sm relative overflow-hidden group"
+                                >
+                                  <div className="relative z-10 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md bg-slate-200 text-slate-600">Feedback</span>
+                                    </div>
+                                    <p className="text-xs font-bold leading-relaxed italic uppercase tracking-tight">"{myFeedback.feedback}"</p>
+                                  </div>
+                                  <MessageCircle className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.03] group-hover:scale-110 transition-transform text-slate-900" />
+                                </motion.div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {announcements.length > 0 && (
                         <div className="space-y-4">
                           <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Team Messages & Goals</h2>
@@ -1465,9 +1504,31 @@ export default function App() {
 
                         // Arrival time is fixed at 30 minutes prior to kick off
                         const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const isMissingDuties = !game.snackProvider || (game.isHome && (!game.pitchMarshal || !game.referee)) || !game.goalie;
-                        const isSwapPending = game.snackSwapRequested || game.marshalSwapRequested || game.refereeSwapRequested || game.goalieSwapRequested;
-                        const coachNotes = feedbacks.some(f => f.gameId === game.id);
+                        const nextApplicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
+                          { id: 'goalie', label: 'Goalie', applicableTo: 'both' },
+                          { id: 'snack_provider', label: 'Snack', applicableTo: 'both' },
+                          { id: 'pitch_marshal', label: 'Marshal', applicableTo: 'home' },
+                          { id: 'referee', label: 'Referee', applicableTo: 'home' }
+                        ]).filter((d: any) => {
+                          if (d.applicableTo === 'both' || !d.applicableTo) return true;
+                          if (d.applicableTo === 'home' && game.isHome) return true;
+                          if (d.applicableTo === 'away' && !game.isHome) return true;
+                          return false;
+                        });
+                        const getNextAssignee = (d: any) =>
+                          (game.assignments?.[d.id]) ||
+                          (d.id === 'goalie' ? game.goalie :
+                           d.id === 'snack_provider' ? game.snackProvider :
+                           d.id === 'pitch_marshal' ? game.pitchMarshal :
+                           d.id === 'referee' ? game.referee : null);
+                        const isMissingDuties = nextApplicableDuties.some((d: any) => !getNextAssignee(d));
+                        const isSwapPending = nextApplicableDuties.some((d: any) =>
+                          (game.swapRequests?.[d.id]) ||
+                          (d.id === 'goalie' ? game.goalieSwapRequested :
+                           d.id === 'snack_provider' ? game.snackSwapRequested :
+                           d.id === 'pitch_marshal' ? game.marshalSwapRequested :
+                           d.id === 'referee' ? game.refereeSwapRequested : false)
+                        );
 
                         return (
                           <section className="space-y-4">
@@ -1489,12 +1550,6 @@ export default function App() {
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                       {date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' })}
                                     </span>
-                                    {coachNotes && (
-                                      <span className="text-[8px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-black uppercase tracking-tighter flex items-center gap-1">
-                                        <MessageCircle className="w-2.5 h-2.5" />
-                                        Coach Notes
-                                      </span>
-                                    )}
                                     {isUnavailable && (
                                       <span className="text-[8px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-black uppercase tracking-tighter flex items-center gap-1">
                                         <UserMinus className="w-2.5 h-2.5" />
@@ -1932,11 +1987,13 @@ function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availab
     return !assignee;
   });
 
-  const isSwapPending = applicableDuties.some(d => {
-    return (game.swapRequests && game.swapRequests[d.id]) || (d.id === 'goalie' ? game.goalieSwapRequested : d.id === 'snackProvider' ? game.snackSwapRequested : d.id === 'pitchMarshal' ? game.marshalSwapRequested : d.id === 'referee' ? game.refereeSwapRequested : false);
-  });
-  
-  const hasNotes = feedbacks.some((f: any) => f.gameId === game.id);
+  const isSwapPending = applicableDuties.some(d =>
+    (game.swapRequests && game.swapRequests[d.id]) ||
+    (d.id === 'goalie' ? game.goalieSwapRequested :
+     d.id === 'snack_provider' ? game.snackSwapRequested :
+     d.id === 'pitch_marshal' ? game.marshalSwapRequested :
+     d.id === 'referee' ? game.refereeSwapRequested : false)
+  );
 
   const myDutyObj = applicableDuties.find(d => {
     const assignee = (game.assignments && game.assignments[d.id]) || (d.id === 'goalie' ? game.goalie : d.id === 'snackProvider' ? game.snackProvider : d.id === 'pitchMarshal' ? game.pitchMarshal : d.id === 'referee' ? game.referee : null);
@@ -1968,12 +2025,6 @@ function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availab
               <div className="flex items-center gap-1 text-[8px] font-black text-emjsc-red uppercase tracking-widest bg-red-50/50 px-1.5 py-0.5 rounded border border-red-100/50">
                 <Zap className="w-2.5 h-2.5" />
                 Est. {game.travelTimeMinutes} min travel from {homeGround || 'Central Park'}
-              </div>
-            )}
-            {hasNotes && (
-              <div className="flex items-center gap-1 text-[8px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
-                <MessageCircle className="w-2.5 h-2.5" />
-                Coach Note
               </div>
             )}
             {isUnavailable && (
@@ -2044,8 +2095,6 @@ function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSignUp, o
     return false;
   });
 
-  const playerFeedback = feedbacks.find((f: any) => f.gameId === game.id && f.playerName === user.displayName);
-
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
@@ -2094,32 +2143,6 @@ function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSignUp, o
           </div>
         </div>
 
-        {playerFeedback && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {playerFeedback.goals && (
-              <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 mb-2 flex items-center gap-2">
-                  <Flag className="w-4 h-4" />
-                  Your Match Goals
-                </h4>
-                <p className="text-xs font-bold text-slate-700 leading-relaxed uppercase tracking-tight">
-                  {playerFeedback.goals}
-                </p>
-              </div>
-            )}
-            {playerFeedback.feedback && (
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-emjsc-navy mb-2 flex items-center gap-2">
-                  <HandMetal className="w-4 h-4" />
-                  Privat Feedback
-                </h4>
-                <p className="text-xs font-bold text-slate-600 leading-relaxed italic uppercase tracking-tight">
-                  "{playerFeedback.feedback}"
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
         {matchAvailabilities.length > 0 && (
           <div className="bg-red-50/50 p-4 rounded-2xl border border-red-100/50">
