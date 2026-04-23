@@ -102,6 +102,13 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidSquadPlayer(data) {
+      return data.size() >= 1 && data.size() <= 5
+        && data.name is string && data.name.size() <= 100
+        && (!('fact' in data) || (data.fact is string && data.fact.size() <= 500))
+        && (!('password' in data) || (data.password is string && data.password.size() <= 100));
+    }
+
     function isValidDutyConfig(data) {
       return data.size() == 6
         && data.id is string && data.id.size() <= 100
@@ -117,6 +124,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(gameId) && isValidGame(incoming());
       allow update: if isValidId(gameId) && isValidGame(incoming());
+      allow delete: if true;
     }
 
     match /feedback/{feedbackId} {
@@ -166,5 +174,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if true;
     }
+
+    match /squad/{playerId} {
+      allow read: if true;
+      allow write: if isValidId(playerId) && isValidSquadPlayer(incoming());
+      allow delete: if true;
+    }
   }
 }
+

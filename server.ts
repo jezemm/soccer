@@ -67,7 +67,19 @@ async function startServer() {
     try {
       const { season, club, tenant } = req.query;
       const tenantId = (tenant as string) || 'w8zdBWPmBX';
-      
+      const driblToken = req.headers['x-dribl-token'] as string | undefined;
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'User-Agent': 'Dribl/2.0 (iPhone; iOS 17.5; Scale/3.00)',
+        'X-Tenant': tenantId,
+        'x-app-version': '2.0.0',
+        'x-platform': 'ios',
+      };
+      if (driblToken) {
+        headers['Authorization'] = `Bearer ${driblToken}`;
+      }
+
       const response = await axios.get("https://mc-api.dribl.com/api/fixtures", {
         params: {
           date_range: 'default',
@@ -76,17 +88,14 @@ async function startServer() {
           tenant: tenantId,
           timezone: 'Australia/Sydney'
         },
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)',
-          'X-Tenant': tenantId
-        }
+        headers
       });
-      
+
       res.json(response.data);
     } catch (error: any) {
       console.error("Dribl Sync Error:", error.message);
-      res.status(500).json({ error: "Failed to fetch fixtures from Dribl" });
+      const status = error.response?.status || 500;
+      res.status(status).json({ error: error.response?.data || "Failed to fetch fixtures from Dribl" });
     }
   });
 
