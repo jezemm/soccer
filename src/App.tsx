@@ -2208,22 +2208,71 @@ export default function App() {
                     </div>
 
                     {/* Coaches */}
-                    {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => (
-                      <div key={account.id} className="bg-emjsc-navy rounded-3xl p-6 flex items-center gap-5 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden">
-                        <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-3xl select-none">🎽</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <p className="text-xl font-black text-white tracking-tighter uppercase">{account.name}</p>
-                            <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">Coach</span>
+                    {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => {
+                      const isMe = isAdmin && userName === account.name;
+                      const profileKey = account.name.replace(/\s+/g, '_');
+                      const photoUrl = profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name));
+                      const bio = profiles[profileKey]?.skills || account.tagline || 'Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.';
+                      const isEditingBio = isMe && editingSkills !== null;
+                      const isEditingAv = isMe && editingAvatar;
+                      return (
+                        <div key={account.id} className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="relative shrink-0">
+                              <img src={photoUrl} alt={account.name} className="w-16 h-16 rounded-2xl" />
+                              {isMe && !isEditingAv && !isEditingBio && (
+                                <button
+                                  onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
+                                  className="absolute -bottom-1.5 -right-1.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-white hover:text-emjsc-navy"
+                                >
+                                  <PencilIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-xl font-black text-white tracking-tighter uppercase">{account.name}</p>
+                                <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">Coach</span>
+                                {isMe && <span className="text-[8px] font-black uppercase bg-white/20 text-white px-1.5 py-0.5 rounded shrink-0">You</span>}
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-white/60 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
-                          <p className="text-[10px] font-bold text-white/80 leading-relaxed">
-                            {account.tagline || 'Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.'}
-                          </p>
+                          {isEditingAv ? (
+                            <div className="bg-white rounded-2xl p-4">
+                              <AvatarEditor
+                                initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(account.name)}
+                                onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
+                                onCancel={() => setEditingAvatar(false)}
+                              />
+                            </div>
+                          ) : isEditingBio ? (
+                            <div className="space-y-2">
+                              <textarea
+                                autoFocus
+                                value={editingSkills}
+                                onChange={(e) => setEditingSkills(e.target.value)}
+                                placeholder="Describe yourself — your coaching philosophy, background, or anything you'd like the team to know..."
+                                className="w-full h-24 p-3 bg-white/10 border border-white/20 rounded-xl text-[10px] font-bold text-white focus:ring-2 focus:ring-white outline-none resize-none placeholder:text-white/30"
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white/10 text-white/70 rounded-xl active:scale-95 transition-all">Cancel</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || photoUrl, profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-white/80 leading-relaxed">{bio}</p>
+                              {isMe && (
+                                <button onClick={() => { setEditingSkills(profiles[profileKey]?.skills || account.tagline || ''); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-white/60 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-95">
+                                  Edit Bio
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
                         </div>
-                        <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* Players — logged-in player first */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2326,21 +2375,68 @@ export default function App() {
                     </div>
 
                     {/* Managers at the end */}
-                    {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => (
-                      <div key={account.id} className="bg-white rounded-3xl p-6 flex items-center gap-5 shadow-sm border border-slate-200 relative overflow-hidden">
-                        <div className="w-16 h-16 rounded-2xl bg-emjsc-navy/10 border border-emjsc-navy/20 flex items-center justify-center shrink-0 text-3xl select-none">📋</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <p className="text-xl font-black text-emjsc-navy tracking-tighter uppercase">{account.name}</p>
-                            <span className="text-[8px] font-black uppercase bg-emjsc-navy text-white px-1.5 py-0.5 rounded shrink-0">Team Manager</span>
+                    {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => {
+                      const isMe = isAdmin && userName === account.name;
+                      const profileKey = account.name.replace(/\s+/g, '_');
+                      const photoUrl = profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name));
+                      const bio = profiles[profileKey]?.skills || account.tagline || 'Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.';
+                      const isEditingBio = isMe && editingSkills !== null;
+                      const isEditingAv = isMe && editingAvatar;
+                      return (
+                        <div key={account.id} className={`bg-white rounded-3xl p-6 shadow-sm border space-y-4 overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
+                          <div className="flex items-center gap-4">
+                            <div className="relative shrink-0">
+                              <img src={photoUrl} alt={account.name} className="w-16 h-16 rounded-2xl" />
+                              {isMe && !isEditingAv && !isEditingBio && (
+                                <button
+                                  onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
+                                  className="absolute -bottom-1.5 -right-1.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
+                                >
+                                  <PencilIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-xl font-black text-emjsc-navy tracking-tighter uppercase">{account.name}</p>
+                                <span className="text-[8px] font-black uppercase bg-emjsc-navy text-white px-1.5 py-0.5 rounded shrink-0">Manager</span>
+                                {isMe && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">You</span>}
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
-                          <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                            {account.tagline || 'Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.'}
-                          </p>
+                          {isEditingAv ? (
+                            <AvatarEditor
+                              initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(account.name)}
+                              onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
+                              onCancel={() => setEditingAvatar(false)}
+                            />
+                          ) : isEditingBio ? (
+                            <div className="space-y-2">
+                              <textarea
+                                autoFocus
+                                value={editingSkills}
+                                onChange={(e) => setEditingSkills(e.target.value)}
+                                placeholder="Describe yourself — your role, background, or anything you'd like the team to know..."
+                                className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-emjsc-navy outline-none resize-none placeholder:text-slate-300"
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all">Cancel</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || photoUrl, profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all">Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-slate-500 leading-relaxed">{bio}</p>
+                              {isMe && (
+                                <button onClick={() => { setEditingSkills(profiles[profileKey]?.skills || account.tagline || ''); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-emjsc-navy border border-emjsc-navy/20 px-3 py-1.5 rounded-lg hover:bg-emjsc-navy hover:text-white transition-all active:scale-95">
+                                  Edit Bio
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     <div className="p-6 bg-slate-100 border border-slate-200 rounded-3xl flex items-start gap-4">
                       <AlertCircle className="w-6 h-6 text-emjsc-red shrink-0" />
