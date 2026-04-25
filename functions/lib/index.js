@@ -35,17 +35,12 @@ function splitOpponent(opponent) {
     return { club: opponent.slice(0, idx), team: opponent.slice(idx + 3) };
 }
 const DEFAULT_DUTIES = [
-    { id: "goalie", label: "Goalie", applicableTo: "both" },
-    { id: "snack_provider", label: "Snacks", applicableTo: "both" },
-    { id: "pitch_marshal", label: "Pitch Marshal", applicableTo: "home" },
-    { id: "referee", label: "Referee", applicableTo: "home" },
+    { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
+    { id: "goalie_2", label: "Goalie (2nd Half)", emoji: "", applicableTo: "both" },
+    { id: "snack_provider", label: "Match Day Snacks", emoji: "", applicableTo: "both" },
+    { id: "referee", label: "Referee", emoji: "", applicableTo: "home" },
+    { id: "pitch_marshal", label: "Pitch Marshall", emoji: "", applicableTo: "home" },
 ];
-const LEGACY = {
-    goalie: "goalie",
-    snack_provider: "snackProvider",
-    pitch_marshal: "pitchMarshal",
-    referee: "referee",
-};
 exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true }, async (req, res) => {
     try {
         const db = (0, firestore_1.getFirestore)(DATABASE_ID);
@@ -53,10 +48,10 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             db.collection("games").orderBy("date", "asc").get(),
             db.collection("dutiesConfig").get(),
         ]);
-        // Build duty config: use Firestore dutiesConfig if available, else defaults
+        // Always use document ID as authoritative id (id in data may differ)
         const duties = dutiesSnap.empty
             ? DEFAULT_DUTIES
-            : dutiesSnap.docs.map((d) => (Object.assign({ id: d.id }, d.data())));
+            : dutiesSnap.docs.map((d) => (Object.assign(Object.assign({}, d.data()), { id: d.id })));
         const now = toUtcStamp(new Date());
         const events = [];
         gamesSnap.forEach((doc) => {
@@ -75,24 +70,34 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             const opponentShort = club || team || g.opponent || "TBC";
             // Duties applicable to this game
             const applicableDuties = duties.filter((d) => {
-                if (!d.applicableTo || d.applicableTo === "both")
+                const at = d.applicableTo;
+                if (!at || at === "both")
                     return true;
-                if (d.applicableTo === "home" && g.isHome)
+                if (at === "home" && g.isHome)
                     return true;
-                if (d.applicableTo === "away" && !g.isHome)
+                if (at === "away" && !g.isHome)
                     return true;
                 return false;
             });
             const dutyLines = applicableDuties.map((d) => {
-                const assignee = (g.assignments && g.assignments[d.id]) ||
-                    (LEGACY[d.id] ? g[LEGACY[d.id]] : null) ||
-                    null;
-                return `${d.label}: ${assignee || "Volunteer needed"}`;
+                const assignee = (g.assignments && g.assignments[d.id]) || null;
+                const prefix = d.emoji ? `${d.emoji} ` : "";
+                return `${prefix}${d.label}: ${assignee || "Volunteer needed"}`;
             });
-            // Build description lines using real newlines — escIcs converts to \n for ICS
+            // Location string — venue name + city for Apple/Google Maps geocoding
+            const locationName = g.location || "";
+            const locationFull = locationName
+                ? `${locationName}, Melbourne VIC, Australia`
+                : "";
+            // Google Maps search link for the description
+            const mapsUrl = g.mapUrlOverride ||
+                (locationName
+                    ? `https://maps.apple.com/?q=${encodeURIComponent(locationName + " Melbourne VIC")}`
+                    : null);
+            // Build description with real newlines — escIcs converts them to \n
             const lines = [
                 `${g.isHome ? "🏠 Home Match" : "✈️ Away Match"}`,
-                `📍 ${g.location || "TBC"}`,
+                `📍 ${locationName || "TBC"}`,
                 `⏰ Kick-off ${kickoffTime} · Arrive by ${arrivalTime}`,
             ];
             if (g.travelTimeMinutes) {
@@ -101,14 +106,17 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             if (club && team) {
                 lines.push(`🆚 ${g.opponent}`);
             }
+            if (mapsUrl) {
+                lines.push(`🗺 ${mapsUrl}`);
+            }
             if (dutyLines.length > 0) {
                 lines.push("");
-                lines.push("VOLUNTEER DUTIES");
+                lines.push("📋 VOLUNTEER DUTIES");
                 lines.push(...dutyLines);
             }
             if (g.matchWrap) {
                 lines.push("");
-                lines.push("COACH NOTES");
+                lines.push("👨‍💼 COACH NOTES");
                 lines.push(g.matchWrap);
             }
             const desc = escIcs(lines.join("\n"));
@@ -118,9 +126,15 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 `DTSTAMP:${now}`,
                 `DTSTART;TZID=${TZID}:${toLocal(start)}`,
                 `DTEND;TZID=${TZID}:${toLocal(end)}`,
-                `SUMMARY:${escIcs(`EMJSC U8 vs ${opponentShort}`)}`,
-                `LOCATION:${escIcs(g.location || "")}`,
+                `SUMMARY:${escIcs(`⚽ EMJSC U8 vs ${opponentShort}`)}`,
+                `LOCATION:${escIcs(locationFull)}`,
                 `DESCRIPTION:${desc}`,
+                // Alert fires 60 min before kick-off = 30 min before arrival
+                "BEGIN:VALARM",
+                "TRIGGER:-PT60M",
+                "ACTION:DISPLAY",
+                `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${locationName || "the venue"}`,
+                "END:VALARM",
                 "END:VEVENT",
             ].join("\r\n"));
         });
