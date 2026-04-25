@@ -2013,24 +2013,28 @@ export default function App() {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Team Squad • U8 White Saturday</h2>
-                      <span className="text-[10px] font-bold text-white bg-emjsc-red px-2 py-1 rounded-full uppercase tracking-tighter shadow-sm">10 Players Squad</span>
+                      <span className="text-[10px] font-bold text-white bg-emjsc-red px-2 py-1 rounded-full uppercase tracking-tighter shadow-sm">{squad.length} Players</span>
                     </div>
 
-                    <div className="bg-emjsc-navy rounded-3xl p-6 flex items-center gap-5 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden">
-                      <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-3xl select-none">🎽</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xl font-black text-white tracking-tighter uppercase">Coach</p>
-                          <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">Coach</span>
+                    {/* Coaches */}
+                    {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => (
+                      <div key={account.id} className="bg-emjsc-navy rounded-3xl p-6 flex items-center gap-5 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden">
+                        <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-3xl select-none">🎽</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-xl font-black text-white tracking-tighter uppercase">{account.name}</p>
+                            <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">Coach</span>
+                          </div>
+                          <p className="text-[10px] text-white/60 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
+                          <p className="text-[10px] font-bold text-white/80 leading-relaxed">
+                            Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.
+                          </p>
                         </div>
-                        <p className="text-[10px] text-white/60 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
-                        <p className="text-[10px] font-bold text-white/80 leading-relaxed">
-                          Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.
-                        </p>
+                        <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
                       </div>
-                      <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
-                    </div>
+                    ))}
 
+                    {/* Players */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {squad.map((player) => {
                         const isMe = player.name === userName;
@@ -2044,9 +2048,9 @@ export default function App() {
                                 className="w-16 h-16 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform"
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-xl font-black text-slate-800 tracking-tighter uppercase truncate">{player.name}</p>
-                                  {isMe && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">You</span>}
+                                <div className="flex items-start gap-2 flex-wrap">
+                                  <p className="text-xl font-black text-slate-800 tracking-tighter uppercase">{player.name}</p>
+                                  {isMe && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0 mt-1">You</span>}
                                 </div>
                                 <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight opacity-60 italic leading-none mt-1">EMJSC • U8 White Saturday</p>
                               </div>
@@ -2103,7 +2107,24 @@ export default function App() {
                         );
                       })}
                     </div>
-                    
+
+                    {/* Managers at the end */}
+                    {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => (
+                      <div key={account.id} className="bg-white rounded-3xl p-6 flex items-center gap-5 shadow-sm border border-slate-200 relative overflow-hidden">
+                        <div className="w-16 h-16 rounded-2xl bg-emjsc-navy/10 border border-emjsc-navy/20 flex items-center justify-center shrink-0 text-3xl select-none">📋</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-xl font-black text-emjsc-navy tracking-tighter uppercase">{account.name}</p>
+                            <span className="text-[8px] font-black uppercase bg-emjsc-navy text-white px-1.5 py-0.5 rounded shrink-0">Team Manager</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
+                          <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                            Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
                     <div className="p-6 bg-slate-100 border border-slate-200 rounded-3xl flex items-start gap-4">
                       <AlertCircle className="w-6 h-6 text-emjsc-red shrink-0" />
                       <div className="space-y-1">
