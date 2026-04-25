@@ -42,11 +42,13 @@ import {
   ChevronDown,
   ChevronLeft,
   Send,
-  Lightbulb
+  Lightbulb,
+  Pencil as PencilIcon
 } from 'lucide-react';
 import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings, TrainingSession } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
-import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl } from './lib/constants';
+import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig } from './lib/constants';
+import { AvatarEditor } from './components/AvatarEditor';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
@@ -111,6 +113,7 @@ export default function App() {
     navigate(VIEW_TO_PATH[v] ?? '/schedule');
   };
   const [editingSkills, setEditingSkills] = useState<string | null>(null);
+  const [editingAvatar, setEditingAvatar] = useState(false);
   const DEFAULT_PLAYER_PASSWORDS: Record<string, string> = {
     "Zephyr Y": "ATTITUDE26", "Harry S": "CREATIVE26", "Myles H": "SMILE26",
     "Tanush P": "VISION26", "Joshua M": "SPIRIT26", "Thomas B": "FOCUS26",
@@ -1651,7 +1654,7 @@ export default function App() {
             </button>
             <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3">
               <img
-                src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || '')}
+                src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(userName || ''))}
                 alt="Avatar"
                 className="w-8 h-8 rounded-full"
                 referrerPolicy="no-referrer"
@@ -1730,7 +1733,7 @@ export default function App() {
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                       <img
-                        src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || '')}
+                        src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(userName || ''))}
                         alt="Avatar"
                         className="w-8 h-8 rounded-full border border-emjsc-red bg-white"
                         referrerPolicy="no-referrer"
@@ -2230,17 +2233,29 @@ export default function App() {
                         return 0;
                       }).map((player) => {
                         const isMe = player.name === userName;
-                        const isEditing = isMe && editingSkills !== null;
+                        const isEditingSkillsForMe = isMe && editingSkills !== null;
+                        const isEditingAvatarForMe = isMe && editingAvatar;
                         const playerProfileKey = player.name.replace(/\s+/g, '_');
-                        const playerPhotoUrl = profiles[playerProfileKey]?.photoUrl || playerAvatar(player.name);
+                        const savedPhotoUrl = profiles[playerProfileKey]?.photoUrl;
+                        const playerPhotoUrl = savedPhotoUrl || getAvataaarsUrl(getDefaultAvatarConfig(player.name));
                         return (
-                          <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow group overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
+                          <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                             <div className="flex items-center gap-4">
-                              <img
-                                src={playerPhotoUrl}
-                                alt={player.name}
-                                className="w-16 h-16 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform"
-                              />
+                              <div className="relative shrink-0">
+                                <img
+                                  src={playerPhotoUrl}
+                                  alt={player.name}
+                                  className="w-16 h-16 rounded-2xl"
+                                />
+                                {isMe && !isEditingAvatarForMe && !isEditingSkillsForMe && (
+                                  <button
+                                    onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
+                                    className="absolute -bottom-1.5 -right-1.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
+                                  >
+                                    <PencilIcon className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start gap-2 flex-wrap">
                                   <p className="text-xl font-black text-slate-800 tracking-tighter uppercase">{player.name}</p>
@@ -2250,7 +2265,16 @@ export default function App() {
                             </div>
 
                             <div className="pt-4 border-t border-slate-50 space-y-3">
-                              {isEditing ? (
+                              {isEditingAvatarForMe ? (
+                                <AvatarEditor
+                                  initialConfig={profiles[playerProfileKey]?.avatarConfig || getDefaultAvatarConfig(player.name)}
+                                  onSave={async (config: AvatarConfig, url: string) => {
+                                    await updateProfile(profiles[playerProfileKey]?.skills || '', url, config);
+                                    setEditingAvatar(false);
+                                  }}
+                                  onCancel={() => setEditingAvatar(false)}
+                                />
+                              ) : isEditingSkillsForMe ? (
                                 <div className="space-y-2">
                                   <textarea
                                     autoFocus
@@ -2265,7 +2289,7 @@ export default function App() {
                                       className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all"
                                     >Cancel</button>
                                     <button
-                                      onClick={async () => { await updateProfile(editingSkills, profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || ''), profiles[(userName || '').replace(/\s+/g, '_')]?.avatarConfig); setEditingSkills(null); }}
+                                      onClick={async () => { await updateProfile(editingSkills!, profiles[playerProfileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(player.name)), profiles[playerProfileKey]?.avatarConfig); setEditingSkills(null); }}
                                       className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all"
                                     >Save</button>
                                   </div>
@@ -2280,16 +2304,16 @@ export default function App() {
                                   </div>
                                   {isMe && (
                                     <button
-                                      onClick={() => setEditingSkills(profiles[player.name.replace(/\s+/g, '_')]?.skills || '')}
+                                      onClick={() => { setEditingSkills(profiles[playerProfileKey]?.skills || ''); setEditingAvatar(false); }}
                                       className="text-[9px] font-black uppercase tracking-widest text-emjsc-navy border border-emjsc-navy/20 px-3 py-1.5 rounded-lg hover:bg-emjsc-navy hover:text-white transition-all active:scale-95"
                                     >
-                                      {profiles[player.name.replace(/\s+/g, '_')]?.skills ? 'Edit Description' : 'Add Description'}
+                                      {profiles[playerProfileKey]?.skills ? 'Edit Description' : 'Add Description'}
                                     </button>
                                   )}
                                 </div>
                               )}
 
-                              {isMe && (
+                              {isMe && !isEditingAvatarForMe && (
                                 <ChangePasswordForm
                                   playerName={player.name}
                                   onSave={(next) => updatePlayerPassword(player.name, next)}
