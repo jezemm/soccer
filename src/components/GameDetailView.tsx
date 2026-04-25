@@ -178,55 +178,81 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         </div>
       </div>
 
-      {nearbyCafes.length > 0 && (
+      {game.location && (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
             <Coffee className="w-4 h-4 text-amber-600" />
             Nearby Coffee
           </h4>
 
-          <div className="space-y-3">
-            {nearbyCafes.map((cafe, i) => (
-              <div key={cafe.name} className={`rounded-2xl border p-4 space-y-2 ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-black text-slate-800">{cafe.name}</p>
-                      {i === 0 && <span className="text-[7px] font-black uppercase tracking-widest bg-amber-500 text-white px-1.5 py-0.5 rounded shrink-0">Top Pick</span>}
-                    </div>
-                    {cafe.rating !== null && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                        <span className="text-[10px] font-black text-amber-700">{cafe.rating.toFixed(1)}</span>
+          {nearbyCafes.length > 0 ? (
+            <div className="space-y-3">
+              {nearbyCafes.map((cafe, i) => (
+                <div key={cafe.name} className={`rounded-2xl border p-4 space-y-2 ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-black text-slate-800">{cafe.name}</p>
+                        {i === 0 && <span className="text-[7px] font-black uppercase tracking-widest bg-amber-500 text-white px-1.5 py-0.5 rounded shrink-0">Top Pick</span>}
                       </div>
-                    )}
-                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{cafe.description}</p>
+                      {cafe.rating !== null && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                          <span className="text-[10px] font-black text-amber-700">{cafe.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{cafe.description}</p>
+                      <a
+                        href={cafe.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 mt-1.5 w-fit group/cafe"
+                      >
+                        <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight group-hover/cafe:text-emjsc-red transition-colors">{cafe.address}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {i === 0 && (
                     <a
-                      href={cafe.mapsUrl}
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 mt-1.5 w-fit group/cafe"
+                      className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
                     >
-                      <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight group-hover/cafe:text-emjsc-red transition-colors">{cafe.address}</span>
+                      <Navigation className="w-3.5 h-3.5" />
+                      Add a Stop on the Way
                     </a>
-                  </div>
+                  )}
                 </div>
-
-                {i === 0 && (
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
-                  >
-                    <Navigation className="w-3.5 h-3.5" />
-                    Add a Stop on the Way
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+              <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                We don't have curated cafe picks for this venue yet — but Google Maps has you covered.
+              </p>
+              <a
+                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(game.location)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
+              >
+                <Coffee className="w-3.5 h-3.5" />
+                Find Cafes Near {game.location.split(',')[0]}
+              </a>
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&travelmode=driving`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Get Directions to Venue
+              </a>
+            </div>
+          )}
         </div>
       )}
     </motion.div>

@@ -2297,12 +2297,13 @@ export default function App() {
 
                 {view === 'game' && selectedGame && (
                   <div className="max-w-4xl mx-auto">
-                    <GameDetailView 
-                      game={games.find(g => g.id === selectedGame.id) || selectedGame} 
+                    <GameDetailView
+                      game={games.find(g => g.id === selectedGame.id) || selectedGame}
                       user={{ displayName: userName }}
                       homeGround={homeGround}
                       feedbacks={feedbacks}
                       availabilities={availabilities}
+                      dutiesConfig={dutiesConfig}
                       onToggleAvailability={handleToggleAvailability}
                       onBack={() => navigate('/schedule')}
                       onSignUp={handleSignUp}
