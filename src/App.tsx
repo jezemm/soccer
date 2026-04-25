@@ -134,11 +134,12 @@ export default function App() {
     "Tanush P": "VISION26", "Joshua M": "SPIRIT26", "Thomas B": "FOCUS26",
     "Benjamin C": "ENERGY26", "Hugo D": "TOUCH26", "Harvey M": "SPEED26", "Julian B": "TEAMWORK26"
   };
-  const [passwords, setPasswords] = useState<{ players: Record<string, string>; coach: string; manager: string }>({
+  const [passwords, setPasswords] = useState<{ players: Record<string, string>; coach: string; manager: string; staffAccounts?: { id: string; name: string; role: string; password: string }[] }>({
     players: DEFAULT_PLAYER_PASSWORDS, coach: 'admin123', manager: 'admin123'
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('teamtrack_admin') === 'true');
+  const [userRole, setUserRole] = useState<string | null>(localStorage.getItem('teamtrack_role'));
   const [adminPass, setAdminPass] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'completed'>('upcoming');
@@ -151,7 +152,7 @@ export default function App() {
   const [coachExemptDuties, setCoachExemptDuties] = useState<string[]>([]);
   const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [targetPlayerProfile, setTargetPlayerProfile] = useState<string | null>(null);
-  const [targetAdminRole, setTargetAdminRole] = useState<'Team Manager' | 'Coach' | null>(null);
+  const [targetAdminRole, setTargetAdminRole] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { skills?: string, photoUrl?: string }>>({});
   const [feedbacks, setFeedbacks] = useState<PlayerFeedback[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -297,6 +298,7 @@ export default function App() {
           players: { ...prev.players, ...(data.players || {}) },
           coach: data.coach || prev.coach,
           manager: data.manager || prev.manager,
+          staffAccounts: data.staffAccounts !== undefined ? data.staffAccounts : prev.staffAccounts,
         }));
       }
     });
@@ -317,6 +319,20 @@ export default function App() {
 
   const updatePasswords = async (next: typeof passwords) => {
     if (!isAdmin) return;
+    setPasswords(next);
+    await setDoc(doc(db, 'settings', 'passwords'), next);
+  };
+
+  const staffAccounts = (passwords.staffAccounts && passwords.staffAccounts.length > 0)
+    ? passwords.staffAccounts
+    : [
+        { id: 'coach_default', name: 'Coach', role: 'coach', password: passwords.coach },
+        { id: 'manager_default', name: 'Manager', role: 'manager', password: passwords.manager },
+      ];
+
+  const handleUpdateStaff = async (accounts: typeof staffAccounts) => {
+    if (!isAdmin) return;
+    const next = { ...passwords, staffAccounts: accounts };
     setPasswords(next);
     await setDoc(doc(db, 'settings', 'passwords'), next);
   };
@@ -623,8 +639,10 @@ export default function App() {
   const logOut = () => {
     localStorage.removeItem('teamtrack_user');
     localStorage.removeItem('teamtrack_admin');
+    localStorage.removeItem('teamtrack_role');
     setUserName(null);
     setIsAdmin(false);
+    setUserRole(null);
   };
 
   const handleSignUp = async (gameId: string, dutyId: string) => {
@@ -1233,20 +1251,16 @@ export default function App() {
     return (
       <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
         <div className="absolute top-6 right-6 flex gap-2">
-          <button
-            onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Team Manager'); }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emjsc-navy text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
-          >
-            <Shield className="w-3.5 h-3.5 text-emjsc-red" />
-            <span className="text-[9px] font-black uppercase tracking-widest">Manager</span>
-          </button>
-          <button
-            onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Coach'); }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[9px] font-black uppercase tracking-widest">Coach</span>
-          </button>
+          {staffAccounts.map(account => (
+            <button
+              key={account.id}
+              onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(account.id); }}
+              className={`flex items-center gap-1.5 px-3 py-2 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md ${account.role === 'manager' ? 'bg-emjsc-navy shadow-blue-900/20' : 'bg-slate-700'}`}
+            >
+              {account.role === 'manager' ? <Shield className="w-3.5 h-3.5 text-emjsc-red" /> : <Zap className="w-3.5 h-3.5 text-amber-400" />}
+              <span className="text-[9px] font-black uppercase tracking-widest">{account.name}</span>
+            </button>
+          ))}
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-12 text-center">
@@ -1291,20 +1305,23 @@ export default function App() {
                   {loginError}
                 </div>
               )}
-              <input 
-                type="password" 
-                placeholder={targetPlayerProfile === 'ADMIN' ? `Password for ${targetAdminRole || 'Admin'}` : "Enter Player Password"}
+              <input
+                type="password"
+                placeholder={targetPlayerProfile === 'ADMIN' ? `Password for ${staffAccounts.find(a => a.id === targetAdminRole)?.name || 'Admin'}` : "Enter Player Password"}
                 value={playerLoginCode}
                 onChange={(e) => setPlayerLoginCode(e.target.value)}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (targetPlayerProfile === 'ADMIN') {
-                      const identity = targetAdminRole || 'Team Manager';
-                      const correctPass = (targetAdminRole === 'Coach' ? passwords.coach : passwords.manager) || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
+                      const account = staffAccounts.find(a => a.id === targetAdminRole);
+                      const identity = account?.name || 'Admin';
+                      const correctPass = account?.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
+                        setUserRole(account?.role || 'manager');
                         localStorage.setItem('teamtrack_admin', 'true');
+                        localStorage.setItem('teamtrack_role', account?.role || 'manager');
                         localStorage.setItem('teamtrack_user', identity);
                         setUserName(identity);
                         setPlayerLoginCode('');
@@ -1330,11 +1347,14 @@ export default function App() {
                 <button
                   onClick={() => {
                     if (targetPlayerProfile === 'ADMIN') {
-                      const identity = targetAdminRole || 'Team Manager';
-                      const correctPass = (targetAdminRole === 'Coach' ? passwords.coach : passwords.manager) || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
+                      const account = staffAccounts.find(a => a.id === targetAdminRole);
+                      const identity = account?.name || 'Admin';
+                      const correctPass = account?.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
+                        setUserRole(account?.role || 'manager');
                         localStorage.setItem('teamtrack_admin', 'true');
+                        localStorage.setItem('teamtrack_role', account?.role || 'manager');
                         localStorage.setItem('teamtrack_user', identity);
                         setUserName(identity);
                         setPlayerLoginCode('');
@@ -2174,6 +2194,9 @@ export default function App() {
                           onUpdatePasswords={updatePasswords}
                           squad={squad}
                           onUpdateSquad={handleUpdateSquad}
+                          userRole={userRole}
+                          staffAccounts={staffAccounts}
+                          onUpdateStaff={handleUpdateStaff}
                         />
                   </div>
                 )}

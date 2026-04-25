@@ -29,13 +29,23 @@ function AdminDutySelector({ label, value, onSelect, squad = [] }: any) {
   );
 }
 
-function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, userName }: any) {
+function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAccounts = [], onUpdateStaff, userRole }: any) {
   const [editingIdx, setEditingIdx] = React.useState<number | null>(null);
   const [editName, setEditName] = React.useState('');
   const [editFact, setEditFact] = React.useState('');
   const [newName, setNewName] = React.useState('');
   const [newFact, setNewFact] = React.useState('');
   const [adding, setAdding] = React.useState(false);
+
+  // Staff account management state
+  const [editingStaffIdx, setEditingStaffIdx] = React.useState<number | null>(null);
+  const [editStaffName, setEditStaffName] = React.useState('');
+  const [editStaffRole, setEditStaffRole] = React.useState('coach');
+  const [editStaffPass, setEditStaffPass] = React.useState('');
+  const [addingStaff, setAddingStaff] = React.useState(false);
+  const [newStaffName, setNewStaffName] = React.useState('');
+  const [newStaffRole, setNewStaffRole] = React.useState('coach');
+  const [newStaffPass, setNewStaffPass] = React.useState('');
 
   const startEdit = (i: number) => { setEditingIdx(i); setEditName(squad[i].name); setEditFact(squad[i].fact); };
   const saveEdit = () => {
@@ -60,10 +70,28 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, userName 
     setNewName(''); setNewFact(''); setAdding(false);
   };
 
-  const staffRows = [
-    { label: 'Coach', key: 'coach' },
-    { label: 'Manager', key: 'manager' },
-  ].filter(({ key }) => userName !== 'Coach' || key === 'coach');
+  const startEditStaff = (i: number) => {
+    setEditingStaffIdx(i); setEditStaffName(staffAccounts[i].name);
+    setEditStaffRole(staffAccounts[i].role); setEditStaffPass(staffAccounts[i].password);
+  };
+  const saveEditStaff = () => {
+    if (!editStaffName.trim()) return;
+    onUpdateStaff(staffAccounts.map((a: any, i: number) => i === editingStaffIdx
+      ? { ...a, name: editStaffName.trim(), role: editStaffRole, password: editStaffPass || a.password }
+      : a));
+    setEditingStaffIdx(null);
+  };
+  const removeStaff = (i: number) => {
+    if (staffAccounts.length <= 1) return;
+    if (!window.confirm(`Remove ${staffAccounts[i].name} from staff?`)) return;
+    onUpdateStaff(staffAccounts.filter((_: any, idx: number) => idx !== i));
+  };
+  const addStaff = () => {
+    if (!newStaffName.trim() || !newStaffPass.trim()) return;
+    const id = `staff_${Date.now()}`;
+    onUpdateStaff([...staffAccounts, { id, name: newStaffName.trim(), role: newStaffRole, password: newStaffPass.trim() }]);
+    setNewStaffName(''); setNewStaffRole('coach'); setNewStaffPass(''); setAddingStaff(false);
+  };
 
   const editPencil = (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,33 +99,72 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, userName 
     </svg>
   );
 
+  const isManager = userRole === 'manager' || !userRole;
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Coaches & Staff</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Coaches & Staff</p>
+          {isManager && !addingStaff && (
+            <button onClick={() => { setAddingStaff(true); setEditingStaffIdx(null); }} className="text-[8px] font-black uppercase tracking-widest text-emjsc-navy bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 flex items-center gap-1">
+              <Plus className="w-2.5 h-2.5" />Add
+            </button>
+          )}
+        </div>
         <div className="border border-slate-200 rounded-2xl overflow-hidden">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-200">
-                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 w-28">Name</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Name</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Role</th>
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Password</th>
+                {isManager && <th className="px-2 py-2 w-16" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {staffRows.map(({ label, key }) => (
-                <tr key={key} className="bg-white">
-                  <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{label}</span></td>
-                  <td className="px-3 py-2">
-                    <input
-                      key={`${key}-${passwords?.[key]}`}
-                      type="text"
-                      defaultValue={passwords?.[key] || ''}
-                      onBlur={(e) => onUpdatePasswords({ ...passwords, [key]: e.target.value.trim() || passwords?.[key] })}
-                      className="w-full p-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy font-mono"
-                    />
+              {staffAccounts.map((a: any, i: number) => editingStaffIdx === i ? (
+                <tr key={a.id} className="bg-blue-50">
+                  <td className="px-3 py-2"><input autoFocus value={editStaffName} onChange={e => setEditStaffName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" /></td>
+                  <td className="px-3 py-2 hidden sm:table-cell">
+                    <select value={editStaffRole} onChange={e => setEditStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
+                      <option value="coach">Coach</option>
+                      <option value="manager">Manager</option>
+                    </select>
                   </td>
+                  <td className="px-3 py-2"><input value={editStaffPass} onChange={e => setEditStaffPass(e.target.value)} placeholder="New password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono" /></td>
+                  <td className="px-2 py-2"><div className="flex gap-1">
+                    <button onClick={saveEditStaff} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                    <button onClick={() => setEditingStaffIdx(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                  </div></td>
+                </tr>
+              ) : (
+                <tr key={a.id} className="bg-white hover:bg-slate-50 group transition-colors">
+                  <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{a.name}</span></td>
+                  <td className="px-3 py-2.5 hidden sm:table-cell"><span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${a.role === 'manager' ? 'bg-emjsc-navy/10 text-emjsc-navy' : 'bg-amber-50 text-amber-700'}`}>{a.role}</span></td>
+                  <td className="px-3 py-2"><span className="text-[10px] font-mono text-slate-400">{'•'.repeat(Math.min(a.password?.length || 0, 8))}</span></td>
+                  {isManager && <td className="px-2 py-2.5"><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => startEditStaff(i)} className="p-1 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg">{editPencil}</button>
+                    {staffAccounts.length > 1 && <button onClick={() => removeStaff(i)} className="p-1 text-emjsc-red hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3" /></button>}
+                  </div></td>}
                 </tr>
               ))}
+              {addingStaff && (
+                <tr className="bg-green-50 border-t border-green-100">
+                  <td className="px-3 py-2"><input autoFocus value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Full name…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none placeholder:text-slate-300" /></td>
+                  <td className="px-3 py-2 hidden sm:table-cell">
+                    <select value={newStaffRole} onChange={e => setNewStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
+                      <option value="coach">Coach</option>
+                      <option value="manager">Manager</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2"><input value={newStaffPass} onChange={e => setNewStaffPass(e.target.value)} placeholder="Password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono placeholder:text-slate-300" /></td>
+                  <td className="px-2 py-2"><div className="flex gap-1">
+                    <button onClick={addStaff} className="p-1 bg-green-600 text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                    <button onClick={() => setAddingStaff(false)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                  </div></td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -247,6 +314,9 @@ export function AdminView({
   onUpdatePasswords,
   squad = [],
   onUpdateSquad,
+  userRole,
+  staffAccounts = [],
+  onUpdateStaff,
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
   const [activeTab, setActiveTab] = useState('matches');
@@ -546,7 +616,9 @@ export function AdminView({
                 onUpdate={onUpdateSquad}
                 passwords={passwords}
                 onUpdatePasswords={onUpdatePasswords}
-                userName={userName}
+                staffAccounts={staffAccounts}
+                onUpdateStaff={onUpdateStaff}
+                userRole={userRole}
               />
             </div>
           </motion.div>
