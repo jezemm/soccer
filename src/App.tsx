@@ -1913,7 +1913,7 @@ export default function App() {
                         return (
                           <div className="space-y-4">
                             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-4">Team Messages & Goals</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                               {visibleAnn.map((ann: Announcement) => (
                                 <motion.div
                                   key={ann.id}
@@ -2231,9 +2231,83 @@ export default function App() {
                       <span className="text-[10px] font-bold text-white bg-emjsc-red px-2 py-1 rounded-full uppercase tracking-tighter shadow-sm">{squad.length} Players</span>
                     </div>
 
+                    {/* My Profile hero card (players only — staff show in their own section) */}
+                    {(() => {
+                      const me = squad.find((p: any) => p.name === userName);
+                      if (!me) return null;
+                      const profileKey = me.name.replace(/\s+/g, '_');
+                      const myPhotoUrl = profiles[profileKey]?.photoUrl;
+                      const myAvatarConfig = profiles[profileKey]?.avatarConfig;
+                      const isEditingAv = editingAvatar;
+                      const isEditingBio = editingSkills !== null;
+                      return (
+                        <div className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="relative shrink-0 w-20 h-20">
+                              <AvatarImage config={myAvatarConfig} photoUrl={myPhotoUrl} fallbackName={me.name} alt={me.name} className="w-20 h-20 rounded-2xl" />
+                              {!isEditingAv && !isEditingBio && (
+                                <button
+                                  onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
+                                  className="absolute bottom-0.5 right-0.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-white hover:text-emjsc-navy"
+                                >
+                                  <PencilIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-xl font-black text-white tracking-tighter uppercase">{me.name}</p>
+                                <span className="text-[8px] font-black uppercase bg-white/20 text-white px-1.5 py-0.5 rounded shrink-0">You</span>
+                              </div>
+                              <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-0.5">Your Profile</p>
+                            </div>
+                          </div>
+                          {isEditingAv ? (
+                            <div className="bg-white rounded-2xl p-4">
+                              <AvatarEditor
+                                initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(me.name)}
+                                onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
+                                onCancel={() => setEditingAvatar(false)}
+                              />
+                            </div>
+                          ) : isEditingBio ? (
+                            <div className="space-y-2">
+                              <textarea
+                                autoFocus
+                                value={editingSkills}
+                                onChange={(e) => setEditingSkills(e.target.value)}
+                                placeholder="Describe your skills, favourite position, or what you're working on..."
+                                className="w-full h-24 p-3 bg-white/10 border border-white/20 rounded-xl text-[10px] font-bold text-white focus:ring-2 focus:ring-white outline-none resize-none placeholder:text-white/30"
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white/10 text-white/70 rounded-xl active:scale-95 transition-all">Cancel</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(me.name)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-white/80 leading-relaxed italic">"{profiles[profileKey]?.skills || me.fact}"</p>
+                              <div className="flex gap-2 flex-wrap">
+                                <button onClick={() => { setEditingSkills(profiles[profileKey]?.skills || ''); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-white/60 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-95">
+                                  Edit Bio
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {!isEditingAv && (
+                            <ChangePasswordForm
+                              playerName={me.name}
+                              onSave={(next) => updatePlayerPassword(me.name, next)}
+                            />
+                          )}
+                          <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Coaches */}
                     {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => {
-                      const isMe = isAdmin && userName === account.name;
+                      const isMe = userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
                       const staffPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
                       const staffAvatarConfig = profiles[profileKey]?.avatarConfig;
@@ -2243,7 +2317,7 @@ export default function App() {
                       return (
                         <div key={account.id} className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
                           <div className="flex items-center gap-4">
-                            <div className="relative shrink-0">
+                            <div className="relative shrink-0 w-16 h-16">
                               <AvatarImage config={staffAvatarConfig} photoUrl={staffPhotoUrl} fallbackName={account.name} alt={account.name} className="w-16 h-16 rounded-2xl" />
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
@@ -2299,14 +2373,10 @@ export default function App() {
                       );
                     })}
 
-                    {/* Players — logged-in player first */}
+                    {/* Players grid — exclude logged-in player (shown in hero card above) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[...squad].sort((a, b) => {
-                        if (a.name === userName) return -1;
-                        if (b.name === userName) return 1;
-                        return 0;
-                      }).map((player) => {
-                        const isMe = player.name === userName;
+                      {squad.filter((p: any) => p.name !== userName).map((player: any) => {
+                        const isMe = false;
                         const isEditingSkillsForMe = isMe && editingSkills !== null;
                         const isEditingAvatarForMe = isMe && editingAvatar;
                         const playerProfileKey = player.name.replace(/\s+/g, '_');
@@ -2315,7 +2385,7 @@ export default function App() {
                         return (
                           <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                             <div className="flex items-center gap-4">
-                              <div className="relative shrink-0">
+                              <div className="relative shrink-0 w-16 h-16">
                                 <AvatarImage
                                   config={playerAvatarConfig}
                                   photoUrl={savedPhotoUrl}
@@ -2403,7 +2473,7 @@ export default function App() {
 
                     {/* Managers at the end */}
                     {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => {
-                      const isMe = isAdmin && userName === account.name;
+                      const isMe = userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
                       const mgrPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
                       const mgrAvatarConfig = profiles[profileKey]?.avatarConfig;
@@ -2413,7 +2483,7 @@ export default function App() {
                       return (
                         <div key={account.id} className={`bg-white rounded-3xl p-6 shadow-sm border space-y-4 overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                           <div className="flex items-center gap-4">
-                            <div className="relative shrink-0">
+                            <div className="relative shrink-0 w-16 h-16">
                               <AvatarImage config={mgrAvatarConfig} photoUrl={mgrPhotoUrl} fallbackName={account.name} alt={account.name} className="w-16 h-16 rounded-2xl" />
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
