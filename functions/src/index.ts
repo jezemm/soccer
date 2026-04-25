@@ -1,7 +1,7 @@
 // Must be first — forces Date local methods to use Melbourne time
 process.env.TZ = "Australia/Melbourne";
 
-import { onRequest, onCall } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -250,12 +250,15 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export const nearbyPlaces = onCall(
-  { region: "australia-southeast1" },
-  async (request) => {
-    const venue = ((request.data?.venue as string) || "").trim();
+export const cafesNearby = onRequest(
+  { region: "australia-southeast1", cors: true, invoker: "public" },
+  async (req, res) => {
+    const venue = ((req.query.venue as string) || "").trim();
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!venue || !apiKey) return { cafes: [] };
+    if (!venue || !apiKey) {
+      res.status(200).json({ cafes: [] });
+      return;
+    }
 
     try {
       // 1. Geocode venue → lat/lng
@@ -265,7 +268,10 @@ export const nearbyPlaces = onCall(
       const geoData = await fetch(geoUrl).then((r) => r.json());
       const venueLoc: { lat: number; lng: number } | undefined =
         geoData.results?.[0]?.geometry?.location;
-      if (!venueLoc) return { cafes: [] };
+      if (!venueLoc) {
+        res.status(200).json({ cafes: [] });
+        return;
+      }
 
       // 2. Places Nearby Search — cafes within 2 km
       const placesUrl =
@@ -289,10 +295,10 @@ export const nearbyPlaces = onCall(
           };
         });
 
-      return { cafes };
+      res.status(200).json({ cafes });
     } catch (err) {
       console.error("nearbyPlaces error:", err);
-      return { cafes: [] };
+      res.status(200).json({ cafes: [] });
     }
   }
 );

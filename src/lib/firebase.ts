@@ -1,11 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const functions = getFunctions(app, 'australia-southeast1');
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+export const FUNCTIONS_BASE = `https://australia-southeast1-${firebaseConfig.projectId}.cloudfunctions.net`;
 
 // CRITICAL: Test connection on boot
 async function testConnection() {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.nearbyPlaces = exports.fixturesICS = void 0;
+exports.cafesNearby = exports.fixturesICS = void 0;
 // Must be first — forces Date local methods to use Melbourne time
 process.env.TZ = "Australia/Melbourne";
 const https_1 = require("firebase-functions/v2/https");
@@ -212,20 +212,24 @@ function haversineKm(lat1, lon1, lat2, lon2) {
             Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-exports.nearbyPlaces = (0, https_1.onCall)({ region: "australia-southeast1" }, async (request) => {
-    var _a, _b, _c, _d;
-    const venue = (((_a = request.data) === null || _a === void 0 ? void 0 : _a.venue) || "").trim();
+exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public" }, async (req, res) => {
+    var _a, _b, _c;
+    const venue = (req.query.venue || "").trim();
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!venue || !apiKey)
-        return { cafes: [] };
+    if (!venue || !apiKey) {
+        res.status(200).json({ cafes: [] });
+        return;
+    }
     try {
         // 1. Geocode venue → lat/lng
         const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json` +
             `?address=${encodeURIComponent(venue)}&key=${apiKey}`;
         const geoData = await fetch(geoUrl).then((r) => r.json());
-        const venueLoc = (_d = (_c = (_b = geoData.results) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.geometry) === null || _d === void 0 ? void 0 : _d.location;
-        if (!venueLoc)
-            return { cafes: [] };
+        const venueLoc = (_c = (_b = (_a = geoData.results) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.geometry) === null || _c === void 0 ? void 0 : _c.location;
+        if (!venueLoc) {
+            res.status(200).json({ cafes: [] });
+            return;
+        }
         // 2. Places Nearby Search — cafes within 2 km
         const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
             `?location=${venueLoc.lat},${venueLoc.lng}&radius=2000&type=cafe&key=${apiKey}`;
@@ -245,11 +249,11 @@ exports.nearbyPlaces = (0, https_1.onCall)({ region: "australia-southeast1" }, a
                 mapsUrl: `https://www.google.com/maps/place/?q=place_id:${p.place_id}`,
             };
         });
-        return { cafes };
+        res.status(200).json({ cafes });
     }
     catch (err) {
         console.error("nearbyPlaces error:", err);
-        return { cafes: [] };
+        res.status(200).json({ cafes: [] });
     }
 });
 //# sourceMappingURL=index.js.map
