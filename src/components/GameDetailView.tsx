@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Calendar, Shield, Users, MapPin, Zap } from 'lucide-react';
-import { splitOpponent } from '../lib/constants';
+import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation } from 'lucide-react';
+import { splitOpponent, getCafesForLocation } from '../lib/constants';
+import type { NearbyCafe } from '../lib/constants';
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
   return (
@@ -60,6 +61,11 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const dateKey = game.date.split('T')[0];
   const isUnavailable = availabilities.some((a: any) => a.playerName === user.displayName && a.dateKey === dateKey && a.isUnavailable);
   const matchAvailabilities = availabilities.filter((a: any) => a.dateKey === dateKey && a.isUnavailable);
+
+  const nearbyCafes = getCafesForLocation(game.location || '');
+  const bestCafe: NearbyCafe | null = nearbyCafes.length > 0
+    ? [...nearbyCafes].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0]
+    : null;
 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -171,6 +177,58 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
           </div>
         </div>
       </div>
+
+      {nearbyCafes.length > 0 && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+            <Coffee className="w-4 h-4 text-amber-600" />
+            Nearby Coffee
+          </h4>
+
+          <div className="space-y-3">
+            {nearbyCafes.map((cafe, i) => (
+              <div key={cafe.name} className={`rounded-2xl border p-4 space-y-2 ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-black text-slate-800">{cafe.name}</p>
+                      {i === 0 && <span className="text-[7px] font-black uppercase tracking-widest bg-amber-500 text-white px-1.5 py-0.5 rounded shrink-0">Top Pick</span>}
+                    </div>
+                    {cafe.rating !== null && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                        <span className="text-[10px] font-black text-amber-700">{cafe.rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{cafe.description}</p>
+                    <a
+                      href={cafe.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 mt-1.5 w-fit group/cafe"
+                    >
+                      <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight group-hover/cafe:text-emjsc-red transition-colors">{cafe.address}</span>
+                    </a>
+                  </div>
+                </div>
+
+                {i === 0 && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    Add a Stop on the Way
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
