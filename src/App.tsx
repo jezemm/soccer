@@ -2193,7 +2193,7 @@ export default function App() {
                           </div>
                           <p className="text-[10px] text-white/60 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
                           <p className="text-[10px] font-bold text-white/80 leading-relaxed">
-                            Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.
+                            {account.tagline || 'Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.'}
                           </p>
                         </div>
                         <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
@@ -2285,7 +2285,7 @@ export default function App() {
                           </div>
                           <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
                           <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                            Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.
+                            {account.tagline || 'Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.'}
                           </p>
                         </div>
                       </div>
