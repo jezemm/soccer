@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -50,14 +50,10 @@ import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerA
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
-import { FaqManager, HelpView } from './components/HelpView';
-import { GameDetailView, EmptyState } from './components/GameDetailView';
-import { AdminCommunications } from './components/AdminCommunications';
-import { AdminModeration } from './components/AdminModeration';
-import { MatchEditor } from './components/MatchEditor';
-import { DutyManager } from './components/DutyManager';
-import { AdminView } from './components/AdminView';
-import { MessagesView } from './components/MessagesView';
+const GameDetailView = React.lazy(() => import('./components/GameDetailView').then(m => ({ default: m.GameDetailView })));
+const HelpView = React.lazy(() => import('./components/HelpView').then(m => ({ default: m.HelpView })));
+const AdminView = React.lazy(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
+const MessagesView = React.lazy(() => import('./components/MessagesView').then(m => ({ default: m.MessagesView })));
 
 function ChangePasswordForm({ playerName, onSave }: { playerName: string; onSave: (next: string) => Promise<string | null> }) {
   const [open, setOpen] = React.useState(false);
@@ -138,6 +134,7 @@ export default function App() {
   const [trainingSchedule, setTrainingSchedule] = useState<TrainingSession[]>([]);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [teamLogoUrl, setTeamLogoUrl] = useState('');
   const [coachChild, setCoachChild] = useState<string | null>(null);
   const [coachExemptDuties, setCoachExemptDuties] = useState<string[]>([]);
@@ -214,6 +211,24 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  const requestUserLocation = () => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  useEffect(() => {
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        .then(result => { if (result.state === 'granted') requestUserLocation(); })
+        .catch(() => {});
+    } else {
+      requestUserLocation();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'calendar'), (snapshot) => {
@@ -1629,7 +1644,7 @@ export default function App() {
             >
               <Lightbulb className="w-4 h-4 shrink-0 group-hover:text-amber-600" />
               <div className="text-left min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest leading-none">Request a Feature</p>
+                <p className="text-[9px] font-black uppercase tracking-widest leading-none">Submit Feedback or Ideas</p>
                 <p className="text-[8px] font-medium text-amber-600/70 leading-none mt-0.5">Got an idea?</p>
               </div>
             </button>
@@ -1706,7 +1721,7 @@ export default function App() {
                     >
                       <Lightbulb className="w-4 h-4 shrink-0" />
                       <div className="text-left">
-                        <p className="text-[9px] font-black uppercase tracking-widest leading-none">Request a Feature</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest leading-none">Submit Feedback or Ideas</p>
                         <p className="text-[8px] font-medium text-amber-600/70 leading-none mt-0.5">Got an idea?</p>
                       </div>
                     </button>
@@ -2019,7 +2034,15 @@ export default function App() {
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
                                   </div>
                                 ) : games.length === 0 ? (
-                                  <EmptyState />
+                                  <div className="py-20 text-center space-y-4">
+                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                                      <Calendar className="w-8 h-8" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <h3 className="font-bold text-lg">No games scheduled</h3>
+                                      <p className="text-slate-500 text-sm">Please contact your coach for more info.</p>
+                                    </div>
+                                  </div>
                                 ) : fixtureGames.length === 0 ? (
                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center w-full">No matches</p>
                                 ) : (
@@ -2038,6 +2061,8 @@ export default function App() {
                                         isSyncing={isSyncing}
                                         dimmed={isDimmed(game)}
                                         onClick={() => navigate('/game/' + game.id)}
+                                        userCoords={userCoords}
+                                        onRequestLocation={requestUserLocation}
                                       />
                                     );
                                     if (!isNext) return <React.Fragment key={game.id}>{card}</React.Fragment>;
@@ -2312,6 +2337,7 @@ export default function App() {
 
                 {view === 'game' && selectedGame && (
                   <div className="max-w-4xl mx-auto">
+                    <Suspense fallback={null}>
                     <GameDetailView
                       game={games.find(g => g.id === selectedGame.id) || selectedGame}
                       user={{ displayName: userName }}
@@ -2325,12 +2351,14 @@ export default function App() {
                       onRequestSwap={handleRequestSwap}
                       isSyncing={isSyncing}
                     />
+                    </Suspense>
                   </div>
                 )}
 
                 {view === 'messages' && (
                   <div className="max-w-4xl mx-auto">
-                    <MessagesView 
+                    <Suspense fallback={null}>
+                    <MessagesView
                       userName={userName || ''} 
                       messages={messages} 
                       blocks={blocks} 
@@ -2341,11 +2369,13 @@ export default function App() {
                       onUnblockUser={handleUnblockUser} 
                       onMarkRead={handleMarkRead}
                     />
+                    </Suspense>
                   </div>
                 )}
 
                 {view === 'admin' && (
                   <div className="max-w-4xl mx-auto">
+                    <Suspense fallback={null}>
                         <AdminView
                           userName={userName}
                           games={games}
@@ -2419,6 +2449,7 @@ export default function App() {
                           calendarUpdatedAt={calendarUpdatedAt}
                           onForceCalendarRefresh={handleForceCalendarRefresh}
                         />
+                    </Suspense>
                   </div>
                 )}
 
@@ -2429,7 +2460,9 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-2xl mx-auto"
                   >
-                    <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} />
+                    <Suspense fallback={null}>
+                      <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} />
+                    </Suspense>
                   </motion.div>
                 )}
               </motion.div>
@@ -2458,7 +2491,7 @@ export default function App() {
                       <Lightbulb className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <h3 className="text-base font-black uppercase tracking-tight text-emjsc-navy leading-none">Request a Feature</h3>
+                      <h3 className="text-base font-black uppercase tracking-tight text-emjsc-navy leading-none">Submit Feedback or Ideas</h3>
                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Help us improve the EMJSC Hub</p>
                     </div>
                     <button onClick={() => setShowFeatureModal(false)} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">

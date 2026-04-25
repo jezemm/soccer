@@ -4,7 +4,7 @@ import { Navigation, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react'
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
-export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
+export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false, userCoords = null, onRequestLocation }: any) {
   const date = new Date(game.date);
   const dateKey = game.date.split('T')[0];
   const isUnavailable = availabilities.some((a: any) => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
@@ -20,50 +20,40 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   const [myTravelMins, setMyTravelMins] = useState<number | null>(null);
   const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
 
-  const fetchMyTravel = () => {
+  const fetchWithCoords = (coords: { lat: number; lng: number }) => {
     if (!travelDest) return;
     setMyTravelStatus('locating');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
-        const departureSecs = Math.floor((date.getTime() - 30 * 60000) / 1000);
-        fetch(
-          `${FUNCTIONS_BASE}/travelTime` +
-          `?origin=${encodeURIComponent(origin)}` +
-          `&destination=${encodeURIComponent(travelDest)}` +
-          `&departureTime=${departureSecs}`
-        )
-          .then(r => r.json())
-          .then(data => {
-            if (data.minutes != null) { setMyTravelMins(data.minutes); setMyTravelStatus('done'); }
-            else setMyTravelStatus('error');
-          })
-          .catch(() => setMyTravelStatus('error'));
-      },
-      () => setMyTravelStatus('error'),
-      { timeout: 10000 }
-    );
+    const origin = `${coords.lat},${coords.lng}`;
+    const departureSecs = Math.floor((date.getTime() - 30 * 60000) / 1000);
+    fetch(
+      `${FUNCTIONS_BASE}/travelTime` +
+      `?origin=${encodeURIComponent(origin)}` +
+      `&destination=${encodeURIComponent(travelDest)}` +
+      `&departureTime=${departureSecs}`
+    )
+      .then(r => r.json())
+      .then(data => {
+        if (data.minutes != null) { setMyTravelMins(data.minutes); setMyTravelStatus('done'); }
+        else setMyTravelStatus('error');
+      })
+      .catch(() => setMyTravelStatus('error'));
   };
 
-  const getMyTravel = (e: React.MouseEvent) => { e.stopPropagation(); fetchMyTravel(); };
-
-  // Auto-fetch if location permission already granted
+  // When coords arrive (from app-level location grant), auto-fetch
   useEffect(() => {
-    if (!travelDest) return;
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName })
-        .then(result => { if (result.state === 'granted') fetchMyTravel(); })
-        .catch(() => {});
-    } else {
-      // Safari: no Permissions API — call getCurrentPosition directly;
-      // returns immediately from cache if already granted, errors silently if not
-      navigator.geolocation.getCurrentPosition(
-        () => fetchMyTravel(),
-        () => {},
-        { timeout: 5000, maximumAge: 300000 }
-      );
+    if (userCoords && travelDest && myTravelStatus === 'idle') {
+      fetchWithCoords(userCoords);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userCoords]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRequestTravel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (userCoords) {
+      fetchWithCoords(userCoords);
+    } else {
+      onRequestLocation?.();
+    }
+  };
 
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
     { id: 'goalie', label: 'Goalie' },
@@ -139,7 +129,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             {travelDest && (
               myTravelStatus === 'done' ? (
                 <button
-                  onClick={getMyTravel}
+                  onClick={handleRequestTravel}
                   className="flex items-center gap-0.5 text-[8px] font-black text-emjsc-red uppercase bg-red-50/50 px-1.5 py-0.5 rounded border border-red-100/50 active:scale-95"
                 >
                   <Car className="w-2.5 h-2.5" />
@@ -152,7 +142,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                 </span>
               ) : (
                 <button
-                  onClick={getMyTravel}
+                  onClick={handleRequestTravel}
                   className="flex items-center gap-0.5 text-[8px] font-black text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 hover:bg-slate-100 active:scale-95"
                 >
                   <Car className="w-2.5 h-2.5" />
