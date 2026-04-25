@@ -2259,15 +2259,21 @@ export default function App() {
                           Subscribe to Calendar
                         </h4>
                         <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                          Download all {games.length} match fixture{games.length !== 1 ? 's' : ''} as a calendar file. Opens directly in Apple Calendar — or import into Google Calendar or Outlook.
+                          Subscribe to a live calendar feed — new fixtures and changes appear automatically in your calendar app.
                         </p>
-                        <button
-                          onClick={downloadICS}
-                          disabled={!gamesLoaded || games.length === 0}
-                          className="w-full flex items-center justify-center gap-2 bg-emjsc-navy hover:bg-emjsc-red text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-40 shadow-md shadow-blue-900/10"
+                        <a
+                          href="webcal://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS"
+                          className="w-full flex items-center justify-center gap-2 bg-emjsc-navy hover:bg-emjsc-red text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl active:scale-[0.98] transition-all shadow-md shadow-blue-900/10"
                         >
                           <CalendarDays className="w-3.5 h-3.5" />
-                          Download .ics File
+                          Subscribe in Calendar App
+                        </a>
+                        <button
+                          onClick={downloadICS}
+                          className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-2xl active:scale-[0.98] transition-all border border-slate-200"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download .ics Instead
                         </button>
                         <p className="text-[8px] text-slate-400 font-bold text-center uppercase tracking-widest leading-relaxed">
                           Apple Calendar · Google Calendar · Outlook
