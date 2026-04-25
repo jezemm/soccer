@@ -34,6 +34,17 @@ function splitOpponent(opponent) {
         return { club: "", team: opponent };
     return { club: opponent.slice(0, idx), team: opponent.slice(idx + 3) };
 }
+function getVenueName(location) {
+    const m = location.match(/^(.*\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
+    if (m)
+        return m[1].trim();
+    return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, "").trim() || location;
+}
+function formatVenueDisplay(location) {
+    const venue = getVenueName(location);
+    const pitch = location.slice(venue.length).trim();
+    return pitch ? `${venue} - ${pitch}` : location;
+}
 const DEFAULT_DUTIES = [
     { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
     { id: "goalie_2", label: "Goalie (2nd Half)", emoji: "", applicableTo: "both" },
@@ -42,17 +53,23 @@ const DEFAULT_DUTIES = [
     { id: "pitch_marshal", label: "Pitch Marshall", emoji: "", applicableTo: "home" },
 ];
 exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true }, async (req, res) => {
+    var _a, _b, _c, _d;
     try {
         const db = (0, firestore_1.getFirestore)(DATABASE_ID);
-        const [gamesSnap, dutiesSnap] = await Promise.all([
+        const [gamesSnap, dutiesSnap, calendarSnap] = await Promise.all([
             db.collection("games").orderBy("date", "asc").get(),
             db.collection("dutiesConfig").get(),
+            db.collection("settings").doc("calendar").get(),
         ]);
         // Always use document ID as authoritative id (id in data may differ)
         const duties = dutiesSnap.empty
             ? DEFAULT_DUTIES
             : dutiesSnap.docs.map((d) => (Object.assign(Object.assign({}, d.data()), { id: d.id })));
+        const calendarData = calendarSnap.exists ? calendarSnap.data() : null;
+        const calendarVersion = (_a = calendarData === null || calendarData === void 0 ? void 0 : calendarData.version) !== null && _a !== void 0 ? _a : 0;
+        const calendarUpdatedAt = (_d = (_c = (_b = calendarData === null || calendarData === void 0 ? void 0 : calendarData.updatedAt) === null || _b === void 0 ? void 0 : _b.toDate) === null || _c === void 0 ? void 0 : _c.call(_b)) !== null && _d !== void 0 ? _d : new Date();
         const now = toUtcStamp(new Date());
+        const lastModified = toUtcStamp(calendarUpdatedAt);
         const events = [];
         gamesSnap.forEach((doc) => {
             const g = doc.data();
@@ -60,8 +77,8 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 return;
             const start = new Date(g.date);
             const end = new Date(start.getTime() + 60 * 60 * 1000);
-            const arrivalTime = new Date(start.getTime() - 30 * 60 * 1000)
-                .toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+            const arrival = new Date(start.getTime() - 30 * 60 * 1000);
+            const arrivalTime = arrival.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
             const kickoffTime = start.toLocaleTimeString("en-AU", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -86,18 +103,19 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             });
             // Location string — venue name + city for Apple/Google Maps geocoding
             const locationName = g.location || "";
-            const locationFull = locationName
-                ? `${locationName}, Melbourne VIC, Australia`
+            const venueName = locationName ? getVenueName(locationName) : "";
+            const locationFull = venueName
+                ? `${venueName}, Melbourne VIC, Australia`
                 : "";
             // Google Maps search link for the description
             const mapsUrl = g.mapUrlOverride ||
-                (locationName
-                    ? `https://maps.apple.com/?q=${encodeURIComponent(locationName + " Melbourne VIC")}`
+                (venueName
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName + " Melbourne VIC")}`
                     : null);
             // Build description with real newlines — escIcs converts them to \n
             const lines = [
                 `${g.isHome ? "🏠 Home Match" : "✈️ Away Match"}`,
-                `📍 ${locationName || "TBC"}`,
+                `📍 ${locationName ? formatVenueDisplay(locationName) : "TBC"}`,
                 `⏰ Kick-off ${kickoffTime} · Arrive by ${arrivalTime}`,
             ];
             if (g.travelTimeMinutes) {
@@ -133,6 +151,8 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 "BEGIN:VEVENT",
                 `UID:${doc.id}@soccerhub.jeremymarks.com.au`,
                 `DTSTAMP:${now}`,
+                `LAST-MODIFIED:${lastModified}`,
+                `SEQUENCE:${calendarVersion}`,
                 `DTSTART;TZID=${TZID}:${toLocal(start)}`,
                 `DTEND;TZID=${TZID}:${toLocal(end)}`,
                 `SUMMARY:${escIcs(`⚽ EMJSC U8 vs ${opponentShort}`)}`,
@@ -141,10 +161,26 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 `DESCRIPTION:${desc}`,
                 // Alert fires 60 min before kick-off = 30 min before arrival
                 "BEGIN:VALARM",
-                "TRIGGER:-PT60M",
+                "TRIGGER;VALUE=DURATION:-PT60M",
                 "ACTION:DISPLAY",
-                `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${locationName || "the venue"}`,
+                `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${venueName || locationName || "the venue"}`,
                 "END:VALARM",
+                "END:VEVENT",
+            ].join("\r\n"));
+            // Travel event: 30 min block before arrival (60 min before kick-off → arrival time)
+            const travelStart = new Date(arrival.getTime() - 30 * 60 * 1000);
+            events.push([
+                "BEGIN:VEVENT",
+                `UID:${doc.id}-travel@soccerhub.jeremymarks.com.au`,
+                `DTSTAMP:${now}`,
+                `LAST-MODIFIED:${lastModified}`,
+                `SEQUENCE:${calendarVersion}`,
+                `DTSTART;TZID=${TZID}:${toLocal(travelStart)}`,
+                `DTEND;TZID=${TZID}:${toLocal(arrival)}`,
+                `SUMMARY:${escIcs(`🚙 Travel to EMJSC Soccer – vs ${opponentShort}`)}`,
+                `LOCATION:${escIcs(locationFull)}`,
+                `URL:${gameUrl}`,
+                `DESCRIPTION:${desc}`,
                 "END:VEVENT",
             ].join("\r\n"));
         });

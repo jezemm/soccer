@@ -149,6 +149,8 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'completed'>('upcoming');
   const [venueFilter, setVenueFilter] = useState<'all' | 'home' | 'away'>('all');
   const [dutyFilter, setDutyFilter] = useState(false);
+  const [calendarVersion, setCalendarVersion] = useState(0);
+  const [calendarUpdatedAt, setCalendarUpdatedAt] = useState<Date | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
@@ -221,6 +223,17 @@ export default function App() {
         setCoachChild(data.coachChild || null);
         setCoachExemptDuties(data.coachExemptDuties || []);
         setMessagingEnabled(data.messagingEnabled !== false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'calendar'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setCalendarVersion(data.version || 0);
+        setCalendarUpdatedAt(data.updatedAt?.toDate?.() || null);
       }
     });
     return () => unsubscribe();
@@ -1050,6 +1063,7 @@ export default function App() {
       await deleteDoc(doc(db, 'games', gameId));
       setAdminActionStatus('Match deleted');
       setTimeout(() => setAdminActionStatus(null), 2000);
+      await bumpCalendar();
     } catch (e: any) {
       console.error('deleteGame error:', e);
       setAdminActionStatus(`Failed: ${e?.code || e?.message || 'unknown error'}`);
@@ -1065,6 +1079,7 @@ export default function App() {
     try {
       await setDoc(doc(db, 'games', gameId), { opponent, date, location, isHome });
       if (!isHome) await syncTravelTime(gameId, location, date);
+      await bumpCalendar();
     } catch (e: any) {
       console.error('Add game error:', e);
       throw e;
@@ -1075,11 +1090,12 @@ export default function App() {
     if (!isAdmin) return;
     try {
       await updateDoc(doc(db, 'games', gameId), updates);
-      
+
       const game = games.find(g => g.id === gameId);
       if (game && (updates.location || updates.date) && !game.isHome) {
         await syncTravelTime(gameId, updates.location || game.location, updates.date || game.date);
       }
+      await bumpCalendar();
     } catch (error) {
       console.error("Update game error:", error);
     }
@@ -1137,6 +1153,22 @@ export default function App() {
     } catch (error) {
       console.error("Update training location error:", error);
     }
+  };
+
+  const bumpCalendar = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'calendar'), {
+        version: calendarVersion + 1,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('bumpCalendar error:', error);
+    }
+  };
+
+  const handleForceCalendarRefresh = async () => {
+    if (!isAdmin) return;
+    await bumpCalendar();
   };
 
   const updateHomeGround = async (location: string) => {
@@ -2510,6 +2542,9 @@ export default function App() {
                           onDeleteFeatureRequest={handleDeleteFeatureRequest}
                           notificationSettings={notificationSettings}
                           onUpdateNotificationSettings={handleUpdateNotificationSettings}
+                          calendarVersion={calendarVersion}
+                          calendarUpdatedAt={calendarUpdatedAt}
+                          onForceCalendarRefresh={handleForceCalendarRefresh}
                         />
                   </div>
                 )}

@@ -69,9 +69,10 @@ export const fixturesICS = onRequest(
     try {
       const db = getFirestore(DATABASE_ID);
 
-      const [gamesSnap, dutiesSnap] = await Promise.all([
+      const [gamesSnap, dutiesSnap, calendarSnap] = await Promise.all([
         db.collection("games").orderBy("date", "asc").get(),
         db.collection("dutiesConfig").get(),
+        db.collection("settings").doc("calendar").get(),
       ]);
 
       // Always use document ID as authoritative id (id in data may differ)
@@ -80,7 +81,12 @@ export const fixturesICS = onRequest(
           ? DEFAULT_DUTIES
           : dutiesSnap.docs.map((d) => ({ ...d.data(), id: d.id }));
 
+      const calendarData = calendarSnap.exists ? calendarSnap.data() : null;
+      const calendarVersion: number = calendarData?.version ?? 0;
+      const calendarUpdatedAt: Date = calendarData?.updatedAt?.toDate?.() ?? new Date();
+
       const now = toUtcStamp(new Date());
+      const lastModified = toUtcStamp(calendarUpdatedAt);
       const events: string[] = [];
 
       gamesSnap.forEach((doc) => {
@@ -175,6 +181,8 @@ export const fixturesICS = onRequest(
             "BEGIN:VEVENT",
             `UID:${doc.id}@soccerhub.jeremymarks.com.au`,
             `DTSTAMP:${now}`,
+            `LAST-MODIFIED:${lastModified}`,
+            `SEQUENCE:${calendarVersion}`,
             `DTSTART;TZID=${TZID}:${toLocal(start)}`,
             `DTEND;TZID=${TZID}:${toLocal(end)}`,
             `SUMMARY:${escIcs(`⚽ EMJSC U8 vs ${opponentShort}`)}`,
@@ -198,6 +206,8 @@ export const fixturesICS = onRequest(
             "BEGIN:VEVENT",
             `UID:${doc.id}-travel@soccerhub.jeremymarks.com.au`,
             `DTSTAMP:${now}`,
+            `LAST-MODIFIED:${lastModified}`,
+            `SEQUENCE:${calendarVersion}`,
             `DTSTART;TZID=${TZID}:${toLocal(travelStart)}`,
             `DTEND;TZID=${TZID}:${toLocal(arrival)}`,
             `SUMMARY:${escIcs(`🚙 Travel to EMJSC Soccer – vs ${opponentShort}`)}`,

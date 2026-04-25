@@ -24,6 +24,8 @@ export interface Game {
   location: string;
   isHome: boolean;
   mapUrlOverride?: string;
+  opponentLogo?: string;
+  homeTeamLogo?: string;
   snackProvider?: string;
   pitchMarshal?: string;
   referee?: string;
