@@ -1845,7 +1845,7 @@ export default function App() {
                         if (!hasPersonalNotes) return null;
                         return (
                           <div className="space-y-4">
-                            <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Coach Notes for You</h2>
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-4">Coach Notes for You</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {myFeedback.goals && (
                                 <motion.div
@@ -1855,9 +1855,9 @@ export default function App() {
                                 >
                                   <div className="relative z-10 space-y-2">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md bg-orange-200 text-orange-700">Your Goals</span>
+                                      <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-orange-200 text-orange-700">Your Goals</span>
                                     </div>
-                                    <p className="text-xs font-bold leading-relaxed italic uppercase tracking-tight">{myFeedback.goals}</p>
+                                    <p className="text-sm font-bold leading-relaxed italic uppercase tracking-tight">{myFeedback.goals}</p>
                                   </div>
                                   <Flag className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.03] group-hover:scale-110 transition-transform text-orange-900" />
                                 </motion.div>
@@ -1870,9 +1870,9 @@ export default function App() {
                                 >
                                   <div className="relative z-10 space-y-2">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md bg-slate-200 text-slate-600">Feedback</span>
+                                      <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-slate-200 text-slate-600">Feedback</span>
                                     </div>
-                                    <p className="text-xs font-bold leading-relaxed italic uppercase tracking-tight">"{myFeedback.feedback}"</p>
+                                    <p className="text-sm font-bold leading-relaxed italic uppercase tracking-tight">"{myFeedback.feedback}"</p>
                                   </div>
                                   <MessageCircle className="absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.03] group-hover:scale-110 transition-transform text-slate-900" />
                                 </motion.div>
@@ -1890,7 +1890,7 @@ export default function App() {
                         if (visibleAnn.length === 0) return null;
                         return (
                           <div className="space-y-4">
-                            <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">Team Messages & Goals</h2>
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-4">Team Messages & Goals</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {visibleAnn.map((ann: Announcement) => (
                                 <motion.div
@@ -1907,7 +1907,7 @@ export default function App() {
                                 >
                                   <div className="relative z-10 space-y-2">
                                     <div className="flex items-center justify-between">
-                                      <span className={`text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md ${
+                                      <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg ${
                                         ann.type === 'goal'
                                           ? 'bg-amber-200 text-amber-700'
                                           : ann.type === 'player_feedback'
@@ -1916,11 +1916,11 @@ export default function App() {
                                       }`}>
                                         {ann.type === 'goal' ? 'Squad Goal' : ann.type === 'player_feedback' ? `Coach → ${ann.targetPlayer}` : 'Message'}
                                       </span>
-                                      <span className="text-[8px] font-bold opacity-40 uppercase tracking-tighter">
+                                      <span className="text-[11px] font-bold opacity-40 uppercase tracking-tighter">
                                         {ann.timestamp?.toDate ? ann.timestamp.toDate().toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : 'Posted Recently'}
                                       </span>
                                     </div>
-                                    <p className="text-xs font-bold leading-relaxed italic uppercase tracking-tight">
+                                    <p className="text-sm font-bold leading-relaxed italic uppercase tracking-tight">
                                       {ann.content}
                                     </p>
                                   </div>
@@ -2003,7 +2003,7 @@ export default function App() {
                               <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
                                 {(['all', 'upcoming', 'completed'] as const).map(s => (
                                   <button key={s} onClick={() => setStatusFilter(s)}
-                                    className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest transition-colors ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
                                     {s === 'all' ? 'All' : s === 'upcoming' ? 'To Play' : 'Completed'}
                                   </button>
                                 ))}
@@ -2011,27 +2011,27 @@ export default function App() {
                               <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
                                 {(['all', 'home', 'away'] as const).map(v => (
                                   <button key={v} onClick={() => setVenueFilter(v)}
-                                    className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest transition-colors ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
                                     {v === 'all' ? 'All Venues' : v}
                                   </button>
                                 ))}
                               </div>
                               {userName && !isAdmin && (
                                 <button onClick={() => setDutyFilter(f => !f)}
-                                  className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-xl border transition-colors ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
+                                  className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest rounded-xl border transition-colors ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
                                   On Duty
                                 </button>
                               )}
                             </div>
                             <section className="space-y-4">
-                              <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
                                 Match Fixture{anyFilterActive ? ` · ${fixtureGames.length} result${fixtureGames.length !== 1 ? 's' : ''}` : ''}
                               </h2>
                               <div className="flex flex-col gap-4">
                                 {!gamesLoaded ? (
                                   <div className="flex flex-col items-center justify-center py-16 gap-3 w-full">
                                     <div className="w-8 h-8 rounded-full border-4 border-slate-100 border-t-emjsc-red animate-spin" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
+                                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
                                   </div>
                                 ) : games.length === 0 ? (
                                   <div className="py-20 text-center space-y-4">
@@ -2044,7 +2044,7 @@ export default function App() {
                                     </div>
                                   </div>
                                 ) : fixtureGames.length === 0 ? (
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center w-full">No matches</p>
+                                  <p className="text-xs font-black uppercase tracking-widest text-slate-300 py-8 text-center w-full">No matches</p>
                                 ) : (
                                   fixtureGames.map((game: GameType) => {
                                     const isNext = game.id === nextGame?.id;
@@ -2068,8 +2068,8 @@ export default function App() {
                                     if (!isNext) return <React.Fragment key={game.id}>{card}</React.Fragment>;
                                     return (
                                       <div key={game.id} className="relative mt-3">
-                                        <div className="absolute -top-3 left-3 z-10 bg-emjsc-navy text-white text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-sm">
-                                          <Zap className="w-2.5 h-2.5" />
+                                        <div className="absolute -top-3.5 left-3 z-10 bg-emjsc-navy text-white text-[11px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                                          <Zap className="w-3 h-3" />
                                           Next Match
                                         </div>
                                         <div className="ring-2 ring-emjsc-navy rounded-[1.75rem] shadow-md">
