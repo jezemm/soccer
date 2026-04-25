@@ -255,6 +255,19 @@ export function formatVenueDisplay(location: string): string {
   return pitch ? `${venue} - ${pitch}` : location;
 }
 
+export function extractDestFromMapUrl(mapUrl: string): string | null {
+  try {
+    // @lat,lng in path — works for place and directions URLs
+    const coordMatch = mapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (coordMatch) return `${coordMatch[1]},${coordMatch[2]}`;
+    // query params: destination= (dir URL), query= (search URL), q= (classic)
+    const url = new URL(mapUrl);
+    const dest = url.searchParams.get('destination') || url.searchParams.get('query') || url.searchParams.get('q');
+    if (dest) return dest;
+  } catch {}
+  return null;
+}
+
 export function getGameMapUrl(game: { location?: string; mapUrlOverride?: string }): string {
   if (game.mapUrlOverride) return game.mapUrlOverride;
   const dest = game.location

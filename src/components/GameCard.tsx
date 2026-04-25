@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Navigation, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
-import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName } from '../lib/constants';
+import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
 export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
   const date = new Date(game.date);
@@ -11,11 +11,11 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   const totalUnavailable = availabilities.filter((a: any) => a.dateKey === dateKey && a.isUnavailable).length;
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const venueName = getVenueName(game.location || '');
-  // Full location minus pitch designator — keeps suburb/state for accurate geocoding
-  const travelDest = game.location
-    ? game.location.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
-    : venueName + ' Melbourne VIC';
+  const rawLocation = game.location || homeGround || '';
+  const venueName = getVenueName(rawLocation);
+  const travelDest = game.mapUrlOverride
+    ? (extractDestFromMapUrl(game.mapUrlOverride) ?? rawLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim())
+    : rawLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim();
 
   const [myTravelMins, setMyTravelMins] = useState<number | null>(null);
   const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
@@ -35,7 +35,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
         )
           .then(r => r.json())
           .then(data => {
-            if (data.minutes) { setMyTravelMins(data.minutes); setMyTravelStatus('done'); }
+            if (data.minutes != null) { setMyTravelMins(data.minutes); setMyTravelStatus('done'); }
             else setMyTravelStatus('error');
           })
           .catch(() => setMyTravelStatus('error'));
@@ -49,7 +49,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
 
   // Auto-fetch if location permission already granted
   useEffect(() => {
-    if (!travelDest || !game.isHome) return;
+    if (!travelDest) return;
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName })
         .then(result => { if (result.state === 'granted') fetchMyTravel(); })
@@ -97,20 +97,46 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1 flex-1 min-w-0">
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
+          {/* Date / home-away / unavailable count */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               {date.toLocaleString('default', { month: 'short' })} {date.getDate()} • {game.isHome ? 'Home' : 'Away'}
             </p>
-            {/* Away: pre-computed travel time from home ground */}
-            {!game.isHome && game.travelTimeMinutes && (
+            {totalUnavailable > 0 && (
+              <div className="flex items-center gap-0.5 text-[8px] font-black text-slate-500 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                <Users className="w-2.5 h-2.5" />
+                {totalUnavailable} Out
+              </div>
+            )}
+          </div>
+
+          {/* Opponent */}
+          <div className="leading-tight">
+            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-lg font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{team}</p>}</>; })()}
+          </div>
+
+          {/* Navigate button */}
+          <a
+            href={getGameMapUrl(game)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
+          >
+            <Navigation className="w-3 h-3 text-emjsc-red shrink-0" />
+            <span className="text-[9px] text-emjsc-navy font-black uppercase tracking-tight">Navigate to {venueName}</span>
+          </a>
+
+          {/* Travel time badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {game.travelTimeMinutes && (
               <div className="flex items-center gap-0.5 text-[8px] font-black text-emjsc-red uppercase bg-red-50/50 px-1.5 py-0.5 rounded border border-red-100/50">
                 <Car className="w-2.5 h-2.5" />
                 {game.travelTimeMinutes}m from Home Ground
               </div>
             )}
-            {/* Home: my-location travel time */}
-            {game.isHome && travelDest && (
+            {travelDest && (
               myTravelStatus === 'done' ? (
                 <button
                   onClick={getMyTravel}
@@ -134,30 +160,13 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                 </button>
               )
             )}
-            {totalUnavailable > 0 && (
-              <div className="flex items-center gap-0.5 text-[8px] font-black text-slate-500 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-                <Users className="w-2.5 h-2.5" />
-                {totalUnavailable} Out
-              </div>
-            )}
           </div>
-          <div className="leading-tight">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-lg font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{team}</p>}</>; })()}
-          </div>
-          <a
-            href={getGameMapUrl(game)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
-          >
-            <Navigation className="w-3 h-3 text-emjsc-red shrink-0" />
-            <span className="text-[9px] text-emjsc-navy font-black uppercase tracking-tight">Navigate to {venueName}</span>
-          </a>
+
+          {/* Availability toggle */}
           {onToggleAvailability && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleAvailability(userName, dateKey); }}
-              className="flex items-center gap-1.5 active:scale-95 transition-all mt-4"
+              className="flex items-center gap-1.5 active:scale-95 transition-all pt-1"
             >
               <div className={`w-8 h-4 rounded-full relative transition-colors duration-200 ${isUnavailable ? 'bg-red-400' : 'bg-green-400'}`}>
                 <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-200 ${isUnavailable ? 'left-0.5' : 'left-4'}`} />
@@ -168,6 +177,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             </button>
           )}
         </div>
+
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {game.opponentLogo && (
             <img

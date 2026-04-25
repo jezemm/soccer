@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings, TrainingSession } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
-import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay } from './lib/constants';
+import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl } from './lib/constants';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
@@ -1069,7 +1069,7 @@ export default function App() {
     const gameId = `${slug}_${dateSlug}`;
     try {
       await setDoc(doc(db, 'games', gameId), { opponent, date, location, isHome });
-      if (!isHome) await syncTravelTime(gameId, location, date);
+      await syncTravelTime(gameId, location, date, undefined);
       await bumpCalendar();
     } catch (e: any) {
       console.error('Add game error:', e);
@@ -1084,12 +1084,12 @@ export default function App() {
 
       const game = games.find(g => g.id === gameId);
       if (game) {
-        const isAway = updates.isHome !== undefined ? !updates.isHome : !game.isHome;
         const locationOrDateChanged = updates.location !== undefined || updates.date !== undefined || updates.isHome !== undefined;
-        if (isAway && locationOrDateChanged) {
+        if (locationOrDateChanged) {
           const location = updates.location ?? game.location;
           const date = updates.date ?? game.date;
-          syncTravelTime(gameId, location, date); // fire-and-forget
+          const mapUrl = updates.mapUrlOverride ?? game.mapUrlOverride;
+          syncTravelTime(gameId, location, date, mapUrl); // fire-and-forget
         }
       }
       await bumpCalendar();
@@ -1200,20 +1200,20 @@ export default function App() {
     if (!homeGround || !gamesLoaded) return;
     const now = new Date();
     const missing = games.filter(
-      g => !g.isHome && !g.travelTimeMinutes && g.location && new Date(g.date) > now
+      g => !g.travelTimeMinutes && g.location && new Date(g.date) > now
     );
     if (missing.length === 0) return;
     missing.forEach((g, i) => {
-      setTimeout(() => syncTravelTime(g.id, g.location, g.date), i * 600);
+      setTimeout(() => syncTravelTime(g.id, g.location, g.date, g.mapUrlOverride), i * 600);
     });
   }, [homeGround, gamesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const syncTravelTime = async (gameId: string, location: string, kickOffDateStr: string) => {
-    if (!homeGround || !location) return null;
+  const syncTravelTime = async (gameId: string, location: string, kickOffDateStr: string, mapUrlOverride?: string) => {
+    if (!homeGround) return null;
 
-    const cleanLocation = location
-      .split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0]
-      .trim();
+    const dest = (mapUrlOverride && extractDestFromMapUrl(mapUrlOverride))
+      || (location ? location.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim() : '');
+    if (!dest) return null;
 
     // Departure = arrival time = 30 min before kick-off
     const departureDate = new Date(new Date(kickOffDateStr).getTime() - 30 * 60000);
@@ -1223,11 +1223,11 @@ export default function App() {
       const resp = await fetch(
         `${FUNCTIONS_BASE}/travelTime` +
         `?origin=${encodeURIComponent(homeGround)}` +
-        `&destination=${encodeURIComponent(cleanLocation)}` +
+        `&destination=${encodeURIComponent(dest)}` +
         `&departureTime=${departureSecs}`
       );
       const data = await resp.json();
-      if (data.minutes) {
+      if (data.minutes != null) {
         await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes: data.minutes });
         return data.minutes as number;
       }
@@ -1313,8 +1313,8 @@ export default function App() {
         try {
           await setDoc(doc(db, 'games', gameId), gameData, { merge: true });
           syncedCount++;
-          if (!isHome && homeGround) {
-            syncTravelTime(gameId, location, dateISO);
+          if (homeGround) {
+            syncTravelTime(gameId, location, dateISO, attrs.map_url);
           }
         } catch (writeErr: any) {
           console.error(`Failed to write game ${gameId}:`, writeErr);

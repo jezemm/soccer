@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
-import { splitOpponent, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay } from '../lib/constants';
+import { splitOpponent, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay, extractDestFromMapUrl } from '../lib/constants';
 import type { NearbyCafe, CafeSortMode } from '../lib/constants';
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
@@ -98,10 +98,9 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const [myTravelMinutes, setMyTravelMinutes] = useState<number | null>(null);
   const [myTravelError, setMyTravelError] = useState<string | null>(null);
 
-  // Full location minus pitch designator — keeps suburb/state for accurate geocoding
-  const travelDest = gameLocation
-    ? gameLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
-    : venueName + ' Melbourne VIC';
+  const travelDest = game.mapUrlOverride
+    ? (extractDestFromMapUrl(game.mapUrlOverride) ?? gameLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim())
+    : gameLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim();
 
   const getMyTravelTime = () => {
     if (!travelDest) return;
@@ -120,7 +119,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         )
           .then(r => r.json())
           .then(data => {
-            if (data.minutes) { setMyTravelMinutes(data.minutes); setMyTravelStatus('done'); }
+            if (data.minutes != null) { setMyTravelMinutes(data.minutes); setMyTravelStatus('done'); }
             else { setMyTravelError('No route found'); setMyTravelStatus('error'); }
           })
           .catch(() => { setMyTravelError('Could not calculate route'); setMyTravelStatus('error'); });
