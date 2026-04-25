@@ -191,17 +191,19 @@ export const fixturesICS = onRequest(
           ].join("\r\n")
         );
 
-        // Travel event: 30 min block before kick-off (arrival time → kick-off)
+        // Travel event: 30 min block before arrival (60 min before kick-off → arrival time)
+        const travelStart = new Date(arrival.getTime() - 30 * 60 * 1000);
         events.push(
           [
             "BEGIN:VEVENT",
             `UID:${doc.id}-travel@soccerhub.jeremymarks.com.au`,
             `DTSTAMP:${now}`,
-            `DTSTART;TZID=${TZID}:${toLocal(arrival)}`,
-            `DTEND;TZID=${TZID}:${toLocal(start)}`,
+            `DTSTART;TZID=${TZID}:${toLocal(travelStart)}`,
+            `DTEND;TZID=${TZID}:${toLocal(arrival)}`,
             `SUMMARY:${escIcs(`🚙 Travel to EMJSC Soccer – vs ${opponentShort}`)}`,
             `LOCATION:${escIcs(locationFull)}`,
             `URL:${gameUrl}`,
+            `DESCRIPTION:${desc}`,
             "END:VEVENT",
           ].join("\r\n")
         );
