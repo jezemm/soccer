@@ -36,7 +36,6 @@ import {
   Ban,
   Trash2,
   Upload,
-  Download,
   PlusCircle,
   HelpCircle,
   ChevronDown,
@@ -108,52 +107,6 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
   return mapsLoader;
 }
 
-function generateICS(games: GameType[]): string {
-  const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const utc = (d: Date) =>
-    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
-
-  const now = utc(new Date());
-
-  const events = games.map(game => {
-    const start = new Date(game.date);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-    const arrivalTime = new Date(start.getTime() - 30 * 60 * 1000)
-      .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const { club, team } = splitOpponent(game.opponent);
-    const opponentDisplay = club || team || game.opponent;
-    const description = esc([
-      game.isHome ? 'Home match' : 'Away match',
-      `Arrive by ${arrivalTime}`,
-      club && team ? `vs ${game.opponent}` : '',
-    ].filter(Boolean).join('\\n'));
-
-    return [
-      'BEGIN:VEVENT',
-      `UID:${game.id}@soccerhub.jeremymarks.com.au`,
-      `DTSTAMP:${now}`,
-      `DTSTART:${utc(start)}`,
-      `DTEND:${utc(end)}`,
-      `SUMMARY:${esc(`EMJSC U8 vs ${opponentDisplay}`)}`,
-      `LOCATION:${esc(game.location || '')}`,
-      `DESCRIPTION:${description}`,
-      'END:VEVENT',
-    ].join('\r\n');
-  });
-
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//EMJSC Hub//U8 White Saturday//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'X-WR-CALNAME:EMJSC U8 White Saturday',
-    'X-WR-CALDESC:Match fixtures for East Malvern Junior Soccer Club U8 White Saturday',
-    ...events,
-    'END:VCALENDAR',
-  ].join('\r\n');
-}
 
 export default function App() {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
@@ -527,19 +480,6 @@ export default function App() {
     } catch (e) {
       console.error('Update notification settings error:', e);
     }
-  };
-
-  const downloadICS = () => {
-    const ics = generateICS(games);
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'emjsc-u8-white-fixtures.ics';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const handleSendMessage = async (receiver: string, content: string) => {
@@ -2268,13 +2208,6 @@ export default function App() {
                           <CalendarDays className="w-3.5 h-3.5" />
                           Subscribe in Calendar App
                         </a>
-                        <button
-                          onClick={downloadICS}
-                          className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-2xl active:scale-[0.98] transition-all border border-slate-200"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Download .ics Instead
-                        </button>
                         <p className="text-[8px] text-slate-400 font-bold text-center uppercase tracking-widest leading-relaxed">
                           Apple Calendar · Google Calendar · Outlook
                         </p>
