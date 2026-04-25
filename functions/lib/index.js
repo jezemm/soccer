@@ -132,11 +132,6 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 lines.push("📋 VOLUNTEER DUTIES");
                 lines.push(...dutyLines);
             }
-            if (g.matchWrap) {
-                lines.push("");
-                lines.push("👨‍💼 COACH NOTES");
-                lines.push(g.matchWrap);
-            }
             // Links section
             const gameUrl = `https://soccerhub.jeremymarks.com.au/#/game/${doc.id}`;
             lines.push("");

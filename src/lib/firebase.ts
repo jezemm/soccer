@@ -34,7 +34,6 @@ export interface Game {
   marshalSwapRequested?: boolean;
   refereeSwapRequested?: boolean;
   goalieSwapRequested?: boolean;
-  matchWrap?: string; // COACH: Message for the whole team
   kickOff?: string;
   travelTimeMinutes?: number;
   assignments?: Record<string, string>; // dutyId -> playerName

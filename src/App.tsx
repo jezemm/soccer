@@ -627,17 +627,6 @@ export default function App() {
     }
   };
 
-  const handleUpdateMatchWrap = async (gameId: string, message: string) => {
-    if (!isAdmin) return;
-    try {
-      await updateDoc(doc(db, 'games', gameId), {
-        matchWrap: message
-      });
-    } catch (error) {
-      console.error("Error updating match wrap:", error);
-    }
-  };
-
   const handleUpdateFeedback = async (gameId: string, playerName: string, feedback: string, goals: string) => {
     if (!isAdmin) return;
     try {

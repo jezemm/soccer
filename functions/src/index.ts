@@ -158,12 +158,6 @@ export const fixturesICS = onRequest(
           lines.push(...dutyLines);
         }
 
-        if (g.matchWrap) {
-          lines.push("");
-          lines.push("👨‍💼 COACH NOTES");
-          lines.push(g.matchWrap);
-        }
-
         // Links section
         const gameUrl = `https://soccerhub.jeremymarks.com.au/#/game/${doc.id}`;
         lines.push("");
