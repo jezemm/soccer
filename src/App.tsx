@@ -1604,11 +1604,20 @@ export default function App() {
               <DesktopNavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
             )}
             <DesktopNavButton active={view === 'help'} onClick={() => setView('help')} icon={<HelpCircle className="w-5 h-5" />} label="Help" />
-            <DesktopNavButton active={false} onClick={() => setShowFeatureModal(true)} icon={<Lightbulb className="w-5 h-5" />} label="Request Feature" />
             {isAdmin && <DesktopNavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-5 h-5" />} label="Admin" />}
           </nav>
 
           <div className="mt-auto pt-6 border-t border-slate-100 flex flex-col gap-4">
+            <button
+              onClick={() => setShowFeatureModal(true)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 transition-all active:scale-[0.98] group"
+            >
+              <Lightbulb className="w-4 h-4 shrink-0 group-hover:text-amber-600" />
+              <div className="text-left min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest leading-none">Request a Feature</p>
+                <p className="text-[8px] font-medium text-amber-600/70 leading-none mt-0.5">Got an idea?</p>
+              </div>
+            </button>
             <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3">
               <img 
                 src={playerAvatar(userName || '')} 
