@@ -270,9 +270,7 @@ export function extractDestFromMapUrl(mapUrl: string): string | null {
 
 export function getGameMapUrl(game: { location?: string; mapUrlOverride?: string }): string {
   if (game.mapUrlOverride) return game.mapUrlOverride;
-  const dest = game.location
-    ? game.location.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
-    : getVenueName(game.location || '') + ' Melbourne VIC';
+  const dest = (game.location || '').split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim();
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
 }
 
