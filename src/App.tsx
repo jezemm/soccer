@@ -2087,6 +2087,7 @@ export default function App() {
                                         onClick={() => navigate('/game/' + game.id)}
                                         userCoords={userCoords}
                                         onRequestLocation={requestUserLocation}
+                                        compact={!isNext}
                                       />
                                     );
                                     if (!isNext) return <React.Fragment key={game.id}>{card}</React.Fragment>;

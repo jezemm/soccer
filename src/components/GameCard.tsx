@@ -4,7 +4,7 @@ import { Navigation, ArrowLeftRight, Car, RefreshCw, Users, Flag, User } from 'l
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
-export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false, userCoords = null, onRequestLocation }: any) {
+export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false, userCoords = null, onRequestLocation, compact = false }: any) {
   const date = new Date(game.date);
   const dateKey = game.date.split('T')[0];
   const isUnavailable = availabilities.some((a: any) => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
@@ -106,24 +106,25 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-xl font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
           </div>
 
-          {/* Full venue address */}
-          {rawLocation && (
+          {/* Full venue address + navigate — next card only */}
+          {!compact && rawLocation && (
             <p className="text-[11px] font-medium text-slate-500 leading-snug">
               {rawLocation}
             </p>
           )}
 
-          {/* Navigate button */}
-          <a
-            href={getGameMapUrl(game)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
-          >
-            <Navigation className="w-3.5 h-3.5 text-emjsc-red shrink-0" />
-            <span className="text-xs text-emjsc-navy font-black uppercase tracking-tight">Navigate</span>
-          </a>
+          {!compact && (
+            <a
+              href={getGameMapUrl(game)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
+            >
+              <Navigation className="w-3.5 h-3.5 text-emjsc-red shrink-0" />
+              <span className="text-xs text-emjsc-navy font-black uppercase tracking-tight">Navigate</span>
+            </a>
+          )}
 
           {/* Availability toggle */}
           {onToggleAvailability && (
@@ -154,39 +155,41 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             <p className="text-xs text-emjsc-navy font-black leading-none uppercase tracking-tighter">ARRIVE {arrivalTime}</p>
             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">KO {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
-          <div className="flex flex-col items-end gap-1 mt-0.5">
-            {game.travelTimeMinutes && (
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400" title="Travel time from home ground">
-                <Flag className="w-3 h-3 shrink-0" />
-                <span>{game.travelTimeMinutes}m</span>
-              </div>
-            )}
-            {travelDest && (
-              myTravelStatus === 'done' ? (
-                <button
-                  onClick={handleRequestTravel}
-                  className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-emjsc-red active:scale-95 transition-all"
-                  title="Travel time from your location — tap to refresh"
-                >
-                  <User className="w-3 h-3 shrink-0" />
-                  <span>{myTravelMins}m</span>
-                </button>
-              ) : myTravelStatus === 'locating' ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-300">
-                  <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
-                </span>
-              ) : (
-                <button
-                  onClick={handleRequestTravel}
-                  className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-slate-500 active:scale-95 transition-all"
-                  title="Tap to get travel time from your location"
-                >
-                  <User className="w-3 h-3 shrink-0" />
-                  <span>?m</span>
-                </button>
-              )
-            )}
-          </div>
+          {!compact && (
+            <div className="flex flex-col items-end gap-1 mt-0.5">
+              {game.travelTimeMinutes && (
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400" title="Travel time from home ground">
+                  <Flag className="w-3 h-3 shrink-0" />
+                  <span>{game.travelTimeMinutes}m</span>
+                </div>
+              )}
+              {travelDest && (
+                myTravelStatus === 'done' ? (
+                  <button
+                    onClick={handleRequestTravel}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-emjsc-red active:scale-95 transition-all"
+                    title="Travel time from your location — tap to refresh"
+                  >
+                    <User className="w-3 h-3 shrink-0" />
+                    <span>{myTravelMins}m</span>
+                  </button>
+                ) : myTravelStatus === 'locating' ? (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-slate-300">
+                    <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleRequestTravel}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-slate-500 active:scale-95 transition-all"
+                    title="Tap to get travel time from your location"
+                  >
+                    <User className="w-3 h-3 shrink-0" />
+                    <span>?m</span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
 
