@@ -49,6 +49,7 @@ import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, A
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
 import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig } from './lib/constants';
 import { AvatarEditor } from './components/AvatarEditor';
+import { TermsModal, DocModal } from './components/TermsModal';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
@@ -114,6 +115,8 @@ export default function App() {
   };
   const [editingSkills, setEditingSkills] = useState<string | null>(null);
   const [editingAvatar, setEditingAvatar] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(() => localStorage.getItem('teamtrack_terms_v1') === 'accepted');
+  const [viewingDoc, setViewingDoc] = useState<'terms' | 'privacy' | null>(null);
   const DEFAULT_PLAYER_PASSWORDS: Record<string, string> = {
     "Zephyr Y": "ATTITUDE26", "Harry S": "CREATIVE26", "Myles H": "SMILE26",
     "Tanush P": "VISION26", "Joshua M": "SPIRIT26", "Thomas B": "FOCUS26",
@@ -1435,6 +1438,18 @@ export default function App() {
     );
   }
 
+  if (userName && !termsAccepted) {
+    return (
+      <TermsModal
+        teamLogoUrl={teamLogoUrl}
+        onAccept={() => {
+          localStorage.setItem('teamtrack_terms_v1', 'accepted');
+          setTermsAccepted(true);
+        }}
+      />
+    );
+  }
+
   if (!userName) {
     return (
       <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
@@ -2587,7 +2602,7 @@ export default function App() {
                     className="max-w-2xl mx-auto"
                   >
                     <Suspense fallback={null}>
-                      <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} />
+                      <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} onShowTerms={(doc: 'terms' | 'privacy') => setViewingDoc(doc)} />
                     </Suspense>
                   </motion.div>
                 )}
@@ -2688,6 +2703,7 @@ export default function App() {
           </nav>
         </div>
       </div>
+      {viewingDoc && <DocModal doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
     </div>
   );
 }

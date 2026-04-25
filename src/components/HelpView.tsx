@@ -311,7 +311,7 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
   );
 }
 
-export function HelpView({ faqItems = [], userRole, isAdmin }: any) {
+export function HelpView({ faqItems = [], userRole, isAdmin, onShowTerms }: any) {
   const [open, setOpen] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const toggle = (id: string) => setOpen(o => o === id ? null : id);
@@ -417,6 +417,22 @@ export function HelpView({ faqItems = [], userRole, isAdmin }: any) {
         <p className="text-xs text-slate-600 font-medium leading-relaxed">
           Contact your team manager directly or reach out via the Messages tab if messaging is enabled.
         </p>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 py-2">
+        <button
+          onClick={() => onShowTerms?.('terms')}
+          className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy transition-colors underline underline-offset-2"
+        >
+          Terms of Use
+        </button>
+        <span className="text-slate-200 text-xs">•</span>
+        <button
+          onClick={() => onShowTerms?.('privacy')}
+          className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy transition-colors underline underline-offset-2"
+        >
+          Privacy Policy
+        </button>
       </div>
     </div>
   );
