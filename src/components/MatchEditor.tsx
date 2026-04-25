@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Trash2, Users, RefreshCw } from 'lucide-react';
+function getNextGameId(games: any[]): string {
+  const now = new Date();
+  const upcoming = [...games]
+    .filter((g: any) => new Date(g.date) >= now)
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return upcoming[0]?.id || games[0]?.id || '';
+}
+
 export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabilities = [], dutiesConfig = [], onDeleteGame, squad = [] }: any) {
-  const [selectedGameId, setSelectedGameId] = useState(games[0]?.id || '');
+  const [selectedGameId, setSelectedGameId] = useState(() => getNextGameId(games));
   const [venue, setVenue] = useState('');
   const [date, setDate] = useState('');
   const [opponent, setOpponent] = useState('');
@@ -16,7 +24,7 @@ export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabili
 
   useEffect(() => {
     if (!selectedGameId && games.length > 0) {
-      setSelectedGameId(games[0].id);
+      setSelectedGameId(getNextGameId(games));
     }
   }, [games, selectedGameId]);
 
