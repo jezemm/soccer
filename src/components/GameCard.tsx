@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, ArrowLeftRight, Zap, Users } from 'lucide-react';
-import { splitOpponent, getGameMapUrl, formatVenueDisplay } from '../lib/constants';
+import { MapPin, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
+import { FUNCTIONS_BASE } from '../lib/firebase';
+import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName } from '../lib/constants';
 
 export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
   const date = new Date(game.date);
@@ -9,6 +10,36 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   const isUnavailable = availabilities.some((a: any) => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
   const totalUnavailable = availabilities.filter((a: any) => a.dateKey === dateKey && a.isUnavailable).length;
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const venueName = getVenueName(game.location || '');
+  const [myTravelMins, setMyTravelMins] = useState<number | null>(null);
+  const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
+
+  const getMyTravel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!venueName) return;
+    setMyTravelStatus('locating');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
+        const departureSecs = Math.floor((date.getTime() - 30 * 60000) / 1000);
+        fetch(
+          `${FUNCTIONS_BASE}/travelTime` +
+          `?origin=${encodeURIComponent(origin)}` +
+          `&destination=${encodeURIComponent(venueName + ' Melbourne VIC')}` +
+          `&departureTime=${departureSecs}`
+        )
+          .then(r => r.json())
+          .then(data => {
+            if (data.minutes) { setMyTravelMins(data.minutes); setMyTravelStatus('done'); }
+            else setMyTravelStatus('error');
+          })
+          .catch(() => setMyTravelStatus('error'));
+      },
+      () => setMyTravelStatus('error'),
+      { timeout: 10000 }
+    );
+  };
 
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
     { id: 'goalie', label: 'Goalie' },
@@ -47,11 +78,37 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               {date.toLocaleString('default', { month: 'short' })} {date.getDate()} • {game.isHome ? 'Home' : 'Away'}
             </p>
+            {/* Away: pre-computed travel time from home ground */}
             {!game.isHome && game.travelTimeMinutes && (
               <div className="flex items-center gap-0.5 text-[8px] font-black text-emjsc-red uppercase bg-red-50/50 px-1.5 py-0.5 rounded border border-red-100/50">
-                <Zap className="w-2.5 h-2.5" />
-                {game.travelTimeMinutes}m
+                <Car className="w-2.5 h-2.5" />
+                {game.travelTimeMinutes}m from Home Ground
               </div>
+            )}
+            {/* Home: my-location travel time */}
+            {game.isHome && venueName && (
+              myTravelStatus === 'done' ? (
+                <button
+                  onClick={getMyTravel}
+                  className="flex items-center gap-0.5 text-[8px] font-black text-emjsc-red uppercase bg-red-50/50 px-1.5 py-0.5 rounded border border-red-100/50 active:scale-95"
+                >
+                  <Car className="w-2.5 h-2.5" />
+                  {myTravelMins}m from My Location
+                </button>
+              ) : myTravelStatus === 'locating' ? (
+                <span className="flex items-center gap-0.5 text-[8px] font-black text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  Getting time…
+                </span>
+              ) : (
+                <button
+                  onClick={getMyTravel}
+                  className="flex items-center gap-0.5 text-[8px] font-black text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 hover:bg-slate-100 active:scale-95"
+                >
+                  <Car className="w-2.5 h-2.5" />
+                  My Travel Time
+                </button>
+              )
             )}
             {totalUnavailable > 0 && (
               <div className="flex items-center gap-0.5 text-[8px] font-black text-slate-500 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
@@ -130,12 +187,12 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                     isMe
                       ? swap ? 'bg-orange-50 border-orange-300 hover:bg-orange-100 active:scale-95' : 'bg-red-50 border-emjsc-red hover:bg-red-100 active:scale-95'
                       : swap
-                        ? 'bg-orange-50 border-orange-200 ring-1 ring-orange-300'
+                        ? 'bg-orange-50 border-orange-200 ring-1 ring-orange-300 active:scale-95'
                         : takenByOther
                           ? 'bg-white border-slate-200 cursor-not-allowed'
                           : isUnavailable
                             ? 'bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed'
-                            : 'bg-white border-slate-200 hover:border-emjsc-navy active:scale-95'
+                            : 'bg-orange-50 border-orange-200 ring-1 ring-orange-300 active:scale-95'
                   } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                 >
                   <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-0 truncate">{duty.emoji && <span className="mr-0.5">{duty.emoji}</span>}{duty.label}</p>
@@ -144,7 +201,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                       : swap ? 'text-orange-600'
                       : takenByOther ? 'text-slate-500'
                       : isUnavailable ? 'text-slate-300'
-                      : 'text-emjsc-navy'
+                      : 'text-orange-600'
                   }`}>
                     {syncing ? '...' : isMe ? (swap ? 'Cancel' : <span className="flex items-center gap-0.5">{(([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee!.split(' '))}<ArrowLeftRight className="w-2.5 h-2.5 shrink-0" /></span>) : swap ? 'Take It' : assignee ? (([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee.split(' ')) : isUnavailable ? 'N/A' : 'Claim'}
                   </p>

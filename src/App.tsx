@@ -25,6 +25,7 @@ import {
   UserCheck,
   UserMinus,
   Zap,
+  Car,
   Lock,
   Unlock,
   Check,
@@ -2106,7 +2107,7 @@ export default function App() {
                                                   ? 'bg-white border-slate-200 cursor-not-allowed'
                                                   : isUnavailable
                                                     ? 'bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed'
-                                                    : 'bg-white border-slate-200 hover:border-emjsc-navy active:scale-95'
+                                                    : 'bg-orange-50 border-orange-200 ring-1 ring-orange-300 active:scale-95'
                                           } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                                         >
                                           <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-0 truncate">{duty.emoji && <span className="mr-0.5">{duty.emoji}</span>}{duty.label}</p>
@@ -2115,7 +2116,7 @@ export default function App() {
                                               : swap ? 'text-orange-600'
                                               : takenByOther ? 'text-slate-500'
                                               : isUnavailable ? 'text-slate-300'
-                                              : 'text-emjsc-navy'
+                                              : 'text-orange-600'
                                           }`}>
                                             {syncing ? '...' : isMe ? (swap ? 'Cancel' : <span className="flex items-center gap-0.5">{(([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee!.split(' '))}<ArrowLeftRight className="w-2.5 h-2.5 shrink-0" /></span>) : swap ? 'Take It' : assignee ? (([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee.split(' ')) : isUnavailable ? 'N/A' : 'Claim'}
                                           </p>
@@ -2125,10 +2126,10 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                {!game.isHome && game.travelTimeMinutes && (
+                                {game.travelTimeMinutes && (
                                   <div className="flex items-center gap-1 text-[9px] font-black text-emjsc-red uppercase tracking-widest bg-red-50 px-3 py-2 rounded-xl w-fit">
-                                    <Zap className="w-3 h-3" />
-                                    Est. {game.travelTimeMinutes} min travel from {homeGround || 'Central Park'}
+                                    <Car className="w-3 h-3" />
+                                    {game.travelTimeMinutes} min from Home Ground
                                   </div>
                                 )}
                               </div>
