@@ -97,6 +97,41 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
 
   return (
     <div className="space-y-4">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add New Question</h3>
+        {addStatus && <p className="text-[9px] font-black uppercase text-emjsc-red animate-pulse">{addStatus}</p>}
+        <div className="space-y-1.5">
+          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Question</label>
+          <input
+            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none"
+            value={newQ}
+            onChange={(e) => setNewQ(e.target.value)}
+            placeholder="e.g. How do I request a swap?"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Answer</label>
+          <textarea
+            rows={4}
+            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none resize-none leading-relaxed"
+            value={newA}
+            onChange={(e) => setNewA(e.target.value)}
+            placeholder="Write the answer here..."
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Visible To</label>
+          <VisibilityCheckboxes value={newVisibleTo} onChange={setNewVisibleTo} />
+        </div>
+        <button
+          onClick={handleAdd}
+          disabled={!newQ.trim() || !newA.trim()}
+          className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-3 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-40"
+        >
+          Add Question
+        </button>
+      </div>
+
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">FAQ Items</h3>
@@ -114,7 +149,7 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
         </div>
 
         {sorted.length === 0 && (
-          <p className="text-[10px] text-slate-400 uppercase font-black text-center py-4">No FAQ items yet. Add one below.</p>
+          <p className="text-[10px] text-slate-400 uppercase font-black text-center py-4">No FAQ items yet.</p>
         )}
 
         <div className="space-y-3">
@@ -187,40 +222,6 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add New Question</h3>
-        {addStatus && <p className="text-[9px] font-black uppercase text-emjsc-red animate-pulse">{addStatus}</p>}
-        <div className="space-y-1.5">
-          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Question</label>
-          <input
-            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none"
-            value={newQ}
-            onChange={(e) => setNewQ(e.target.value)}
-            placeholder="e.g. How do I request a swap?"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Answer</label>
-          <textarea
-            rows={4}
-            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none resize-none leading-relaxed"
-            value={newA}
-            onChange={(e) => setNewA(e.target.value)}
-            placeholder="Write the answer here..."
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Visible To</label>
-          <VisibilityCheckboxes value={newVisibleTo} onChange={setNewVisibleTo} />
-        </div>
-        <button
-          onClick={handleAdd}
-          disabled={!newQ.trim() || !newA.trim()}
-          className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-3 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-40"
-        >
-          Add Question
-        </button>
-      </div>
     </div>
   );
 }
