@@ -2199,18 +2199,44 @@ export default function App() {
                           Subscribe to Calendar
                         </h4>
                         <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                          Subscribe to a live calendar feed — new fixtures and changes appear automatically in your calendar app.
+                          Subscribe to a live feed — fixtures and updates sync automatically to your calendar app.
                         </p>
-                        <a
-                          href="webcal://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS"
-                          className="w-full flex items-center justify-center gap-2 bg-emjsc-navy hover:bg-emjsc-red text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-2xl active:scale-[0.98] transition-all shadow-md shadow-blue-900/10"
-                        >
-                          <CalendarDays className="w-3.5 h-3.5" />
-                          Subscribe in Calendar App
-                        </a>
-                        <p className="text-[8px] text-slate-400 font-bold text-center uppercase tracking-widest leading-relaxed">
-                          Apple Calendar · Google Calendar · Outlook
-                        </p>
+                        <div className="space-y-2">
+                          <a
+                            href="webcal://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS"
+                            className="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-all active:scale-[0.98] group"
+                          >
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-white leading-none">Apple Calendar</p>
+                              <p className="text-[8px] text-white/50 font-medium mt-0.5">iPhone · iPad · Mac</p>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/60 transition-colors" />
+                          </a>
+                          <a
+                            href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent("webcal://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 transition-all active:scale-[0.98] group"
+                          >
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 leading-none">Google Calendar</p>
+                              <p className="text-[8px] text-slate-400 font-medium mt-0.5">Android · Web</p>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                          </a>
+                          <a
+                            href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent("https://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between px-4 py-3 rounded-2xl bg-[#0078D4] hover:bg-[#006cbe] transition-all active:scale-[0.98] group"
+                          >
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-white leading-none">Outlook</p>
+                              <p className="text-[8px] text-white/60 font-medium mt-0.5">Windows · Web · Microsoft 365</p>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/60 transition-colors" />
+                          </a>
+                        </div>
                       </div>
                     </div>
                   </div>
