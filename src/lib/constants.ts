@@ -330,7 +330,7 @@ export function getDefaultAvatarConfig(name: string): AvatarConfig {
   const hash = (name || '').split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) & 0xfffffff, 0);
   const pick = <T>(arr: T[], offset: number) => arr[Math.abs(hash + offset * 7919) % arr.length];
   return {
-    topType: pick(AVATAR_OPTIONS.topType, 0),
+    topType: 'WinterHat1',
     accessoriesType: pick(AVATAR_OPTIONS.accessoriesType, 1),
     hairColor: pick(AVATAR_OPTIONS.hairColor, 2),
     facialHairType: 'Blank',
