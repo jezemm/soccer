@@ -2245,7 +2245,7 @@ export default function App() {
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
-                                  className="absolute -bottom-1.5 -right-1.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-white hover:text-emjsc-navy"
+                                  className="absolute bottom-0.5 right-0.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-white hover:text-emjsc-navy"
                                 >
                                   <PencilIcon className="w-3 h-3" />
                                 </button>
@@ -2323,7 +2323,7 @@ export default function App() {
                                 {isMe && !isEditingAvatarForMe && !isEditingSkillsForMe && (
                                   <button
                                     onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
-                                    className="absolute -bottom-1.5 -right-1.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
+                                    className="absolute bottom-0.5 right-0.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
                                   >
                                     <PencilIcon className="w-3 h-3" />
                                   </button>
@@ -2415,7 +2415,7 @@ export default function App() {
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
-                                  className="absolute -bottom-1.5 -right-1.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
+                                  className="absolute bottom-0.5 right-0.5 bg-emjsc-navy text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-red"
                                 >
                                   <PencilIcon className="w-3 h-3" />
                                 </button>
