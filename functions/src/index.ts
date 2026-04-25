@@ -124,7 +124,7 @@ export const fixturesICS = onRequest(
         // Google Maps search link for the description
         const mapsUrl = g.mapUrlOverride ||
           (venueName
-            ? `https://maps.apple.com/?q=${encodeURIComponent(venueName + " Melbourne VIC")}`
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName + " Melbourne VIC")}`
             : null);
 
         // Build description with real newlines — escIcs converts them to \n
