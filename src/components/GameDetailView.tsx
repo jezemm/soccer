@@ -128,6 +128,14 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
     );
   };
 
+  // Auto-fetch if location permission already granted
+  useEffect(() => {
+    if (!venueName) return;
+    navigator.permissions?.query({ name: 'geolocation' as PermissionName })
+      .then(result => { if (result.state === 'granted') getMyTravelTime(); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
@@ -200,7 +208,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 {formatVenueDisplay(game.location)}
               </a>
             </p>
-            {!game.isHome && game.travelTimeMinutes && myTravelStatus !== 'done' && (
+            {!game.isHome && game.travelTimeMinutes && (
               <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
                 <Car className="w-4 h-4 text-emjsc-red" />
                 ~{game.travelTimeMinutes} min from home ground

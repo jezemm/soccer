@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
@@ -15,8 +15,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   const [myTravelMins, setMyTravelMins] = useState<number | null>(null);
   const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
 
-  const getMyTravel = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const fetchMyTravel = () => {
     if (!venueName) return;
     setMyTravelStatus('locating');
     navigator.geolocation.getCurrentPosition(
@@ -40,6 +39,16 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
       { timeout: 10000 }
     );
   };
+
+  const getMyTravel = (e: React.MouseEvent) => { e.stopPropagation(); fetchMyTravel(); };
+
+  // Auto-fetch if location permission already granted
+  useEffect(() => {
+    if (!venueName || !game.isHome) return;
+    navigator.permissions?.query({ name: 'geolocation' as PermissionName })
+      .then(result => { if (result.state === 'granted') fetchMyTravel(); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
     { id: 'goalie', label: 'Goalie' },
