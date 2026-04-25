@@ -34,9 +34,11 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   return (
     <motion.div
       whileTap={dimmed ? undefined : { scale: 0.98 }}
-      onClick={dimmed ? undefined : onClick}
+      onClick={onClick}
       className={`bg-white p-4 rounded-[1.75rem] shadow-sm border flex flex-col transition-all gap-3 ${
-        dimmed ? 'opacity-50 grayscale cursor-default' : `cursor-pointer ${isSwapPending ? 'border-orange-300 bg-orange-50/30' : isMissingDuties ? 'border-amber-200' : 'border-slate-200 hover:border-emjsc-navy'}`
+        dimmed
+          ? 'opacity-50 grayscale cursor-pointer border-slate-200'
+          : `cursor-pointer ${isSwapPending ? 'border-orange-300 bg-orange-50/30' : isMissingDuties ? 'border-amber-200' : 'border-slate-200 hover:border-emjsc-navy'}`
       }`}
     >
       <div className="flex items-start justify-between gap-3">

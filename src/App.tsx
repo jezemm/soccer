@@ -85,6 +85,9 @@ export default function App() {
   const [adminPass, setAdminPass] = useState('');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'completed'>('all');
+  const [venueFilter, setVenueFilter] = useState<'all' | 'home' | 'away'>('all');
+  const [dutyFilter, setDutyFilter] = useState(false);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
@@ -1769,14 +1772,55 @@ export default function App() {
 
                       {(() => {
                         const HOUR_MS = 60 * 60 * 1000;
-                        const activeGames = games.filter((g: GameType) => now - new Date(g.date).getTime() < 2 * HOUR_MS);
-                        const completedGames = games.filter((g: GameType) => now - new Date(g.date).getTime() >= 2 * HOUR_MS);
-                        const isInProgress = (g: GameType) => { const ms = now - new Date(g.date).getTime(); return ms >= HOUR_MS && ms < 2 * HOUR_MS; };
-                        const upcomingFixtures = activeGames.slice(1);
+                        const nextGame = games.find((g: GameType) => now - new Date(g.date).getTime() < 2 * HOUR_MS);
+                        const isDimmed = (g: GameType) => now - new Date(g.date).getTime() >= HOUR_MS;
+                        const hasUserDuty = (g: GameType) => {
+                          if (!userName) return false;
+                          if (g.assignments && Object.values(g.assignments as Record<string, string>).includes(userName)) return true;
+                          return g.goalie === userName || g.snackProvider === userName || g.pitchMarshal === userName || g.referee === userName;
+                        };
+                        const fixtureGames = games
+                          .filter((g: GameType) => g.id !== nextGame?.id)
+                          .filter((g: GameType) => {
+                            const kickoff = new Date(g.date).getTime();
+                            if (statusFilter === 'upcoming' && kickoff <= now) return false;
+                            if (statusFilter === 'completed' && kickoff > now) return false;
+                            if (venueFilter === 'home' && !g.isHome) return false;
+                            if (venueFilter === 'away' && g.isHome) return false;
+                            if (dutyFilter && !hasUserDuty(g)) return false;
+                            return true;
+                          });
+                        const anyFilterActive = statusFilter !== 'all' || venueFilter !== 'all' || dutyFilter;
                         return (
                           <>
+                            <div className="flex flex-wrap gap-2">
+                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                                {(['all', 'upcoming', 'completed'] as const).map(s => (
+                                  <button key={s} onClick={() => setStatusFilter(s)}
+                                    className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {s === 'all' ? 'All' : s === 'upcoming' ? 'To Play' : 'Completed'}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                                {(['all', 'home', 'away'] as const).map(v => (
+                                  <button key={v} onClick={() => setVenueFilter(v)}
+                                    className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {v === 'all' ? 'All Venues' : v}
+                                  </button>
+                                ))}
+                              </div>
+                              {userName && (
+                                <button onClick={() => setDutyFilter(f => !f)}
+                                  className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-xl border transition-colors ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
+                                  On Duty
+                                </button>
+                              )}
+                            </div>
                             <section className="space-y-4">
-                              <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Match Fixture</h2>
+                              <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                Match Fixture{anyFilterActive ? ` · ${fixtureGames.length} result${fixtureGames.length !== 1 ? 's' : ''}` : ''}
+                              </h2>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
                                 {!gamesLoaded ? (
                                   <div className="flex flex-col items-center justify-center py-16 gap-3 col-span-full">
@@ -1785,8 +1829,10 @@ export default function App() {
                                   </div>
                                 ) : games.length === 0 ? (
                                   <EmptyState />
-                                ) : upcomingFixtures.length === 0 ? null : (
-                                  upcomingFixtures.map((game: GameType) => (
+                                ) : fixtureGames.length === 0 ? (
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center col-span-full">No matches</p>
+                                ) : (
+                                  fixtureGames.map((game: GameType) => (
                                     <GameCard
                                       key={game.id}
                                       game={game}
@@ -1795,35 +1841,16 @@ export default function App() {
                                       feedbacks={feedbacks}
                                       availabilities={availabilities}
                                       dutiesConfig={dutiesConfig}
-                                      onSignUp={handleSignUp}
-                                      onToggleAvailability={handleToggleAvailability}
+                                      onSignUp={isDimmed(game) ? undefined : handleSignUp}
+                                      onToggleAvailability={isDimmed(game) ? undefined : handleToggleAvailability}
                                       isSyncing={isSyncing}
-                                      dimmed={isInProgress(game)}
+                                      dimmed={isDimmed(game)}
                                       onClick={() => { setSelectedGame(game); setView('game'); }}
                                     />
                                   ))
                                 )}
                               </div>
                             </section>
-                            {completedGames.length > 0 && (
-                              <section className="space-y-4">
-                                <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Completed Games</h2>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                                  {completedGames.map((game: GameType) => (
-                                    <GameCard
-                                      key={game.id}
-                                      game={game}
-                                      userName={userName}
-                                      homeGround={homeGround}
-                                      feedbacks={feedbacks}
-                                      availabilities={availabilities}
-                                      dutiesConfig={dutiesConfig}
-                                      dimmed
-                                    />
-                                  ))}
-                                </div>
-                              </section>
-                            )}
                           </>
                         );
                       })()}
