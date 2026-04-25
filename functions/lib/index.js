@@ -1,15 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fixturesICS = void 0;
+// Must be first — forces Date local methods to use Melbourne time
+process.env.TZ = "Australia/Melbourne";
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 (0, app_1.initializeApp)();
 const DATABASE_ID = "ai-studio-d1fcc763-4ce4-4bde-b121-8a73822ddcd3";
+const TZID = "Australia/Melbourne";
 function pad(n) {
     return String(n).padStart(2, "0");
 }
-function toUtc(d) {
+// Format as Melbourne local time for use with TZID property
+function toLocal(d) {
+    return (`${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
+        `T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`);
+}
+// UTC timestamp for DTSTAMP (must always be UTC per RFC 5545)
+function toUtcStamp(d) {
     return (`${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
         `T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`);
 }
@@ -33,7 +42,7 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             .collection("games")
             .orderBy("date", "asc")
             .get();
-        const now = toUtc(new Date());
+        const now = toUtcStamp(new Date());
         const events = [];
         snap.forEach((doc) => {
             const g = doc.data();
@@ -57,8 +66,8 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 "BEGIN:VEVENT",
                 `UID:${doc.id}@soccerhub.jeremymarks.com.au`,
                 `DTSTAMP:${now}`,
-                `DTSTART:${toUtc(start)}`,
-                `DTEND:${toUtc(end)}`,
+                `DTSTART;TZID=${TZID}:${toLocal(start)}`,
+                `DTEND;TZID=${TZID}:${toLocal(end)}`,
                 `SUMMARY:${summary}`,
                 `LOCATION:${escIcs(g.location || "")}`,
                 `DESCRIPTION:${desc}`,
@@ -71,6 +80,7 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             "PRODID:-//EMJSC Hub//U8 White Saturday//EN",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
+            `X-WR-TIMEZONE:${TZID}`,
             "X-WR-CALNAME:EMJSC U8 White Saturday",
             "X-WR-CALDESC:Match fixtures for East Malvern Junior Soccer Club U8 White Saturday",
             "REFRESH-INTERVAL;VALUE=DURATION:PT6H",

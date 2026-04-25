@@ -1,3 +1,6 @@
+// Must be first — forces Date local methods to use Melbourne time
+process.env.TZ = "Australia/Melbourne";
+
 import { onRequest } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -5,12 +8,22 @@ import { getFirestore } from "firebase-admin/firestore";
 initializeApp();
 
 const DATABASE_ID = "ai-studio-d1fcc763-4ce4-4bde-b121-8a73822ddcd3";
+const TZID = "Australia/Melbourne";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function toUtc(d: Date) {
+// Format as Melbourne local time for use with TZID property
+function toLocal(d: Date): string {
+  return (
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
+    `T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+  );
+}
+
+// UTC timestamp for DTSTAMP (must always be UTC per RFC 5545)
+function toUtcStamp(d: Date): string {
   return (
     `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
     `T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
@@ -41,7 +54,7 @@ export const fixturesICS = onRequest(
         .orderBy("date", "asc")
         .get();
 
-      const now = toUtc(new Date());
+      const now = toUtcStamp(new Date());
       const events: string[] = [];
 
       snap.forEach((doc) => {
@@ -71,8 +84,8 @@ export const fixturesICS = onRequest(
             "BEGIN:VEVENT",
             `UID:${doc.id}@soccerhub.jeremymarks.com.au`,
             `DTSTAMP:${now}`,
-            `DTSTART:${toUtc(start)}`,
-            `DTEND:${toUtc(end)}`,
+            `DTSTART;TZID=${TZID}:${toLocal(start)}`,
+            `DTEND;TZID=${TZID}:${toLocal(end)}`,
             `SUMMARY:${summary}`,
             `LOCATION:${escIcs(g.location || "")}`,
             `DESCRIPTION:${desc}`,
@@ -87,6 +100,7 @@ export const fixturesICS = onRequest(
         "PRODID:-//EMJSC Hub//U8 White Saturday//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
+        `X-WR-TIMEZONE:${TZID}`,
         "X-WR-CALNAME:EMJSC U8 White Saturday",
         "X-WR-CALDESC:Match fixtures for East Malvern Junior Soccer Club U8 White Saturday",
         "REFRESH-INTERVAL;VALUE=DURATION:PT6H",
