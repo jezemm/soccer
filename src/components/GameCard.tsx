@@ -122,7 +122,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
           >
             <Navigation className="w-3.5 h-3.5 text-emjsc-red shrink-0" />
-            <span className="text-xs text-emjsc-navy font-black uppercase tracking-tight">Navigate to {venueName}</span>
+            <span className="text-xs text-emjsc-navy font-black uppercase tracking-tight">Navigate</span>
           </a>
 
           {/* Availability toggle */}
