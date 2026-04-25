@@ -151,6 +151,7 @@ export default function App() {
   const [dutyFilter, setDutyFilter] = useState(false);
   const [calendarVersion, setCalendarVersion] = useState(0);
   const [calendarUpdatedAt, setCalendarUpdatedAt] = useState<Date | null>(null);
+  const [driblCache, setDriblCache] = useState<import('./components/AdminView').DriblCache | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
@@ -234,6 +235,21 @@ export default function App() {
         const data = snapshot.data();
         setCalendarVersion(data.version || 0);
         setCalendarUpdatedAt(data.updatedAt?.toDate?.() || null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'driblCache'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setDriblCache({
+          fixtures: data.fixtures || [],
+          emjscTeams: data.emjscTeams || [],
+          selectedTeam: data.selectedTeam || '',
+          savedAt: data.savedAt || new Date().toISOString(),
+        });
       }
     });
     return () => unsubscribe();
@@ -1322,6 +1338,19 @@ export default function App() {
 
   const confirmSyncFixtures = async (fixtures: any[], teamName: string) => {
     await bulkSyncFixtures({ data: fixtures }, teamName);
+  };
+
+  const saveDriblCache = async (cache: import('./components/AdminView').DriblCache) => {
+    try {
+      await setDoc(doc(db, 'settings', 'driblCache'), {
+        fixtures: cache.fixtures,
+        emjscTeams: cache.emjscTeams,
+        selectedTeam: cache.selectedTeam,
+        savedAt: cache.savedAt,
+      });
+    } catch (err) {
+      console.error('saveDriblCache error:', err);
+    }
   };
 
   const refreshTravelTimes = async () => {
@@ -2497,6 +2526,8 @@ export default function App() {
                           onBulkSync={bulkSyncFixtures}
                           onFetchDribl={fetchDriblFixtures}
                           onConfirmSync={confirmSyncFixtures}
+                          driblCache={driblCache}
+                          onSaveDriblCache={saveDriblCache}
                           coachChild={coachChild}
                           onUpdateCoachChild={updateCoachChild}
                           coachExemptDuties={coachExemptDuties}

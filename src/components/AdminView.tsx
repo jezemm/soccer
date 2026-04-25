@@ -281,31 +281,112 @@ function opponentShort(fullName: string): string {
   return fullName.replace(/\s+U\d{2}\s+.*/i, '').trim();
 }
 
+// ── CoachPlayerDutiesPanel ────────────────────────────────────────────────────
+
+function CoachPlayerDutiesPanel({ games, dutiesConfig, squad, onManualAssign }: any) {
+  const playerDuties = (dutiesConfig as any[]).filter((d: any) => !d.type || d.type === 'player');
+  const upcoming = [...(games as any[])]
+    .filter((g: any) => g.date && new Date(g.date) >= new Date(Date.now() - 24 * 60 * 60 * 1000))
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (upcoming.length === 0) return (
+    <p className="text-center text-[10px] font-black uppercase text-slate-400 py-8 italic">No upcoming games</p>
+  );
+
+  return (
+    <div className="space-y-4">
+      {upcoming.map((game: any) => {
+        const dateStr = new Date(game.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+        const applicableDuties = playerDuties.filter((d: any) => {
+          const at = d.applicableTo;
+          if (!at || at === 'both') return true;
+          if (at === 'home' && game.isHome) return true;
+          if (at === 'away' && !game.isHome) return true;
+          return false;
+        });
+        return (
+          <div key={game.id} className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${game.isHome ? 'bg-emjsc-navy' : 'bg-amber-400'}`} />
+              <div>
+                <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none">
+                  vs {game.opponent?.split(' - ')[0] || game.opponent || 'TBC'}
+                </p>
+                <p className="text-[8px] font-bold uppercase text-slate-400 mt-0.5">
+                  {dateStr} · {game.isHome ? 'Home' : 'Away'}
+                </p>
+              </div>
+            </div>
+            {applicableDuties.length === 0 ? (
+              <p className="text-[9px] text-slate-300 font-bold italic">No player duties for this game</p>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {applicableDuties.map((duty: any) => {
+                  const current = (game.assignments && game.assignments[duty.id]) || '';
+                  return (
+                    <AdminDutySelector
+                      key={duty.id}
+                      label={duty.label}
+                      value={current}
+                      onSelect={(val: string) => onManualAssign(game.id, duty.id, val)}
+                      squad={squad}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── DriblScrapePanel ──────────────────────────────────────────────────────────
+
+export type DriblCache = { fixtures: any[]; emjscTeams: string[]; selectedTeam: string; savedAt: string };
 
 type ScrapePhase =
   | { tag: 'idle' }
   | { tag: 'scraping' }
-  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string }
+  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string; cachedAt?: string }
   | { tag: 'syncing' }
   | { tag: 'done'; count: number }
   | { tag: 'error'; message: string };
 
-function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
+function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDriblCache }: {
   onFetchDribl: () => Promise<{ fixtures: any[]; debug: any } | null>;
   onConfirmSync: (fixtures: any[], teamName: string) => Promise<void>;
+  driblCache: DriblCache | null;
+  onSaveDriblCache: (cache: DriblCache) => Promise<void>;
 }) {
-  const [phase, setPhase] = React.useState<ScrapePhase>({ tag: 'idle' });
+  const initPhase = (): ScrapePhase => {
+    if (driblCache && driblCache.fixtures.length > 0) {
+      return { tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt };
+    }
+    return { tag: 'idle' };
+  };
+
+  const [phase, setPhase] = React.useState<ScrapePhase>(initPhase);
+
+  // Restore from cache when cache prop arrives asynchronously (Firestore load)
+  React.useEffect(() => {
+    if (!driblCache || driblCache.fixtures.length === 0) return;
+    setPhase(prev =>
+      prev.tag === 'idle'
+        ? { tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt }
+        : prev
+    );
+  }, [driblCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startScrape = async () => {
     setPhase({ tag: 'scraping' });
     try {
       const result = await onFetchDribl();
       if (!result || result.fixtures.length === 0) {
-        setPhase({ tag: 'error', message: 'Scrape returned no fixtures. Check server logs.' });
+        setPhase({ tag: 'error', message: 'Sync returned no fixtures. Check server logs.' });
         return;
       }
-      // Collect unique EMJSC team names from home + away columns
       const teamSet = new Set<string>();
       for (const f of result.fixtures) {
         for (const name of [f.home_team_name, f.away_team_name]) {
@@ -314,7 +395,9 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
       }
       const emjscTeams = Array.from(teamSet).sort();
       const selectedTeam = emjscTeams[0] ?? '';
-      setPhase({ tag: 'preview', allFixtures: result.fixtures, emjscTeams, selectedTeam });
+      const cache: DriblCache = { fixtures: result.fixtures, emjscTeams, selectedTeam, savedAt: new Date().toISOString() };
+      await onSaveDriblCache(cache);
+      setPhase({ tag: 'preview', allFixtures: result.fixtures, emjscTeams, selectedTeam, cachedAt: cache.savedAt });
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Unknown error' });
     }
@@ -331,7 +414,13 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
         (f.away_team_name || '').includes(selectedTeam)
       ).length;
       setPhase({ tag: 'done', count });
-      setTimeout(() => setPhase({ tag: 'idle' }), 4000);
+      setTimeout(() => {
+        if (driblCache) {
+          setPhase({ tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt });
+        } else {
+          setPhase({ tag: 'idle' });
+        }
+      }, 3000);
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Sync failed' });
     }
@@ -344,7 +433,7 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
       className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3"
     >
       <Zap className="w-4 h-4 text-yellow-300" />
-      Scrape Dribl — Fixtures, Logos &amp; Maps
+      Sync from Dribl — Fixtures, Logos &amp; Maps
     </button>
   );
 
@@ -363,12 +452,20 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
   if (phase.tag === 'error') return (
     <div className="space-y-3">
       <div className="w-full bg-red-50 border border-red-200 rounded-2xl p-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emjsc-red mb-1">Scrape Failed</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emjsc-red mb-1">Sync Failed</p>
         <p className="text-[10px] text-red-700 font-medium">{phase.message}</p>
       </div>
-      <button onClick={() => setPhase({ tag: 'idle' })} className="w-full bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200">
-        Try Again
-      </button>
+      <div className="flex gap-2">
+        <button onClick={startScrape} className="flex-1 bg-emjsc-navy text-white text-[10px] font-black uppercase py-3 rounded-2xl flex items-center justify-center gap-2">
+          <RefreshCw className="w-3.5 h-3.5" />Try Again
+        </button>
+        {driblCache && (
+          <button onClick={() => setPhase({ tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt })}
+            className="flex-1 bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200">
+            Use Cached
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -391,7 +488,7 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
   );
 
   // ── Preview ──
-  const { allFixtures, emjscTeams, selectedTeam } = phase;
+  const { allFixtures, emjscTeams, selectedTeam, cachedAt } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
   const teamFixtures = allFixtures
     .filter(f =>
       (f.home_team_name || '').includes(selectedTeam) ||
@@ -399,18 +496,24 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
     )
     .sort((a, b) => Number(a.round) - Number(b.round));
 
+  const cachedLabel = cachedAt
+    ? new Date(cachedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : null;
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">
-            {allFixtures.length} fixtures scraped
+            {allFixtures.length} fixtures loaded
           </p>
-          <p className="text-[9px] text-slate-400 font-medium mt-0.5">Select a team to preview and save</p>
+          <p className="text-[9px] text-slate-400 font-medium mt-0.5">
+            {cachedLabel ? `Synced ${cachedLabel}` : 'Select a team to preview and save'}
+          </p>
         </div>
-        <button onClick={() => setPhase({ tag: 'idle' })} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-          <X className="w-4 h-4 text-slate-400" />
+        <button onClick={startScrape} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-emjsc-navy text-[9px] font-black uppercase rounded-xl border border-slate-200 transition-colors">
+          <RefreshCw className="w-3 h-3" />Sync Again
         </button>
       </div>
 
@@ -530,6 +633,8 @@ export function AdminView({
   onBulkSync,
   onFetchDribl,
   onConfirmSync,
+  driblCache = null,
+  onSaveDriblCache,
   onClearSchedule,
   onDeleteGame,
   coachChild,
@@ -576,7 +681,8 @@ export function AdminView({
   onForceCalendarRefresh,
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
-  const [activeTab, setActiveTab] = useState('matches');
+  const isCoach = userRole === 'coach';
+  const [activeTab, setActiveTab] = useState(isCoach ? 'content' : 'matches');
 
   if (!isLoggedIn) {
     return (
@@ -617,16 +723,21 @@ export function AdminView({
 
   const newFeatureCount = (featureRequests as any[]).filter((r: any) => r.status !== 'reviewed').length;
 
-  const tabs = [
-    { id: 'matches', label: 'Match Day', icon: <Calendar className="w-3 h-3" /> },
-    { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
-    ...(messagingEnabled ? [{ id: 'moderate', label: 'Moderation', icon: <Shield className="w-3 h-3" /> }] : []),
-    { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
-    { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
-    { id: 'faq', label: 'FAQ', icon: <HelpCircle className="w-3 h-3" /> },
-    { id: 'features', label: 'Features', icon: <Lightbulb className="w-3 h-3" />, badge: newFeatureCount },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-3 h-3" /> },
-  ];
+  const tabs = isCoach
+    ? [
+        { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
+        { id: 'playerduties', label: 'Player Duties', icon: <Users className="w-3 h-3" /> },
+      ]
+    : [
+        { id: 'matches', label: 'Match Day', icon: <Calendar className="w-3 h-3" /> },
+        { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
+        ...(messagingEnabled ? [{ id: 'moderate', label: 'Moderation', icon: <Shield className="w-3 h-3" /> }] : []),
+        { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
+        { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
+        { id: 'faq', label: 'FAQ', icon: <HelpCircle className="w-3 h-3" /> },
+        { id: 'features', label: 'Features', icon: <Lightbulb className="w-3 h-3" />, badge: newFeatureCount },
+        { id: 'settings', label: 'Settings', icon: <Settings className="w-3 h-3" /> },
+      ];
 
   return (
     <div className="space-y-6">
@@ -677,6 +788,21 @@ export function AdminView({
       )}
 
       <AnimatePresence mode="wait">
+        {activeTab === 'playerduties' && (
+          <motion.div key="playerduties" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
+            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Player Duty Assignments</h3>
+              <p className="text-[9px] text-slate-400 font-medium">Override player duty assignments for upcoming games. Parent duties (snacks, referee, pitch marshal) are managed by the team manager.</p>
+              <CoachPlayerDutiesPanel
+                games={games}
+                dutiesConfig={dutiesConfig}
+                squad={squad}
+                onManualAssign={onManualAssign}
+              />
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'content' && (
           <motion.div key="content" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
             <AdminCommunications
@@ -724,7 +850,7 @@ export function AdminView({
 
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fixture Integration</h3>
-              <DriblScrapePanel onFetchDribl={onFetchDribl} onConfirmSync={onConfirmSync} />
+              <DriblScrapePanel onFetchDribl={onFetchDribl} onConfirmSync={onConfirmSync} driblCache={driblCache} onSaveDriblCache={onSaveDriblCache} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
