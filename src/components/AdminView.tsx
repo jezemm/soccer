@@ -29,7 +29,7 @@ function AdminDutySelector({ label, value, onSelect, squad = [] }: any) {
   );
 }
 
-function SquadManager({ squad, onUpdate }: any) {
+function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, userName }: any) {
   const [editingIdx, setEditingIdx] = React.useState<number | null>(null);
   const [editName, setEditName] = React.useState('');
   const [editFact, setEditFact] = React.useState('');
@@ -40,8 +40,14 @@ function SquadManager({ squad, onUpdate }: any) {
   const startEdit = (i: number) => { setEditingIdx(i); setEditName(squad[i].name); setEditFact(squad[i].fact); };
   const saveEdit = () => {
     if (!editName.trim()) return;
-    const next = squad.map((p: any, i: number) => i === editingIdx ? { name: editName.trim(), fact: editFact.trim() } : p);
-    onUpdate(next);
+    const oldName = squad[editingIdx!].name;
+    const nextName = editName.trim();
+    onUpdate(squad.map((p: any, i: number) => i === editingIdx ? { name: nextName, fact: editFact.trim() } : p));
+    if (oldName !== nextName && passwords?.players?.[oldName] !== undefined) {
+      const np = { ...passwords.players, [nextName]: passwords.players[oldName] };
+      delete np[oldName];
+      onUpdatePasswords({ ...passwords, players: np });
+    }
     setEditingIdx(null);
   };
   const remove = (i: number) => {
@@ -54,69 +60,135 @@ function SquadManager({ squad, onUpdate }: any) {
     setNewName(''); setNewFact(''); setAdding(false);
   };
 
+  const staffRows = [
+    { label: 'Coach', key: 'coach' },
+    { label: 'Manager', key: 'manager' },
+  ].filter(({ key }) => userName !== 'Coach' || key === 'coach');
+
+  const editPencil = (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    </svg>
+  );
+
   return (
-    <div className="space-y-3">
-      <div className="border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-100 border-b border-slate-200">
-              <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Name</th>
-              <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Tagline</th>
-              <th className="px-2 py-2 w-16" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {squad.map((p: any, i: number) => editingIdx === i ? (
-              <tr key={i} className="bg-blue-50">
-                <td className="px-3 py-2">
-                  <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" />
-                </td>
-                <td className="px-3 py-2">
-                  <input value={editFact} onChange={e => setEditFact(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" />
-                </td>
-                <td className="px-2 py-2">
-                  <div className="flex gap-1">
-                    <button onClick={saveEdit} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
-                    <button onClick={() => setEditingIdx(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
-                  </div>
-                </td>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Coaches & Staff</p>
+        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-200">
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 w-28">Name</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Password</th>
               </tr>
-            ) : (
-              <tr key={i} className="bg-white hover:bg-slate-50 group transition-colors">
-                <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{p.name}</span></td>
-                <td className="px-3 py-2.5"><p className="text-[9px] text-slate-500 line-clamp-1">{p.fact}</p></td>
-                <td className="px-2 py-2.5">
-                  <div className="flex gap-1">
-                    <button onClick={() => startEdit(i)} className="p-1 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                    <button onClick={() => remove(i)} className="p-1 text-emjsc-red hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3" /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {adding && (
-              <tr className="bg-green-50 border-t border-green-100">
-                <td className="px-3 py-2">
-                  <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Player name…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none placeholder:text-slate-300" />
-                </td>
-                <td className="px-3 py-2">
-                  <input value={newFact} onChange={e => setNewFact(e.target.value)} placeholder="Tagline (optional)…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none placeholder:text-slate-300" />
-                </td>
-                <td className="px-2 py-2">
-                  <div className="flex gap-1">
-                    <button onClick={addNew} className="p-1 bg-green-600 text-white rounded-lg"><Check className="w-3 h-3" /></button>
-                    <button onClick={() => setAdding(false)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {staffRows.map(({ label, key }) => (
+                <tr key={key} className="bg-white">
+                  <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{label}</span></td>
+                  <td className="px-3 py-2">
+                    <input
+                      key={`${key}-${passwords?.[key]}`}
+                      type="text"
+                      defaultValue={passwords?.[key] || ''}
+                      onBlur={(e) => onUpdatePasswords({ ...passwords, [key]: e.target.value.trim() || passwords?.[key] })}
+                      className="w-full p-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy font-mono"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      {!adding && (
-        <button onClick={() => { setAdding(true); setEditingIdx(null); }} className="w-full bg-slate-50 text-emjsc-navy border border-slate-200 font-black py-2.5 rounded-xl uppercase tracking-[0.1em] text-[9px] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-          <Plus className="w-3.5 h-3.5" />Add Player
-        </button>
-      )}
+
+      <div className="space-y-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Players</p>
+        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-200">
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Name</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Tagline</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Password</th>
+                <th className="px-2 py-2 w-16" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {squad.map((p: any, i: number) => editingIdx === i ? (
+                <tr key={i} className="bg-blue-50">
+                  <td className="px-3 py-2">
+                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" />
+                  </td>
+                  <td className="px-3 py-2 hidden sm:table-cell">
+                    <input value={editFact} onChange={e => setEditFact(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      key={`${p.name}-${passwords?.players?.[p.name]}`}
+                      type="text"
+                      defaultValue={passwords?.players?.[p.name] || ''}
+                      onBlur={(e) => onUpdatePasswords({ ...passwords, players: { ...passwords?.players, [p.name]: e.target.value.trim() || passwords?.players?.[p.name] } })}
+                      className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono"
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <div className="flex gap-1">
+                      <button onClick={saveEdit} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setEditingIdx(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={i} className="bg-white hover:bg-slate-50 group transition-colors">
+                  <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{p.name}</span></td>
+                  <td className="px-3 py-2.5 hidden sm:table-cell"><p className="text-[9px] text-slate-500 line-clamp-1">{p.fact}</p></td>
+                  <td className="px-3 py-2">
+                    <input
+                      key={`${p.name}-${passwords?.players?.[p.name]}`}
+                      type="text"
+                      defaultValue={passwords?.players?.[p.name] || ''}
+                      onBlur={(e) => onUpdatePasswords({ ...passwords, players: { ...passwords?.players, [p.name]: e.target.value.trim() || passwords?.players?.[p.name] } })}
+                      className="w-full p-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy font-mono"
+                    />
+                  </td>
+                  <td className="px-2 py-2.5">
+                    <div className="flex gap-1">
+                      <button onClick={() => startEdit(i)} className="p-1 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg">{editPencil}</button>
+                      <button onClick={() => remove(i)} className="p-1 text-emjsc-red hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {adding && (
+                <tr className="bg-green-50 border-t border-green-100">
+                  <td className="px-3 py-2">
+                    <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Player name…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none placeholder:text-slate-300" />
+                  </td>
+                  <td className="px-3 py-2 hidden sm:table-cell">
+                    <input value={newFact} onChange={e => setNewFact(e.target.value)} placeholder="Tagline (optional)…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none placeholder:text-slate-300" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="text-[9px] text-slate-300 font-bold italic">Set after saving</span>
+                  </td>
+                  <td className="px-2 py-2">
+                    <div className="flex gap-1">
+                      <button onClick={addNew} className="p-1 bg-green-600 text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setAdding(false)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!adding && (
+          <button onClick={() => { setAdding(true); setEditingIdx(null); }} className="w-full bg-slate-50 text-emjsc-navy border border-slate-200 font-black py-2.5 rounded-xl uppercase tracking-[0.1em] text-[9px] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+            <Plus className="w-3.5 h-3.5" />Add Player
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -221,8 +293,8 @@ export function AdminView({
     { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
     ...(messagingEnabled ? [{ id: 'moderate', label: 'Moderation', icon: <Shield className="w-3 h-3" /> }] : []),
     { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
+    { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
     { id: 'faq', label: 'FAQ', icon: <HelpCircle className="w-3 h-3" /> },
-    { id: 'passwords', label: 'Passwords', icon: <Lock className="w-3 h-3" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-3 h-3" /> },
   ];
 
@@ -465,6 +537,21 @@ export function AdminView({
           </motion.div>
         )}
 
+        {activeTab === 'squad' && (
+          <motion.div key="squad" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
+            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Squad & Passwords</h3>
+              <SquadManager
+                squad={squad}
+                onUpdate={onUpdateSquad}
+                passwords={passwords}
+                onUpdatePasswords={onUpdatePasswords}
+                userName={userName}
+              />
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div key="settings" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
@@ -499,56 +586,6 @@ export function AdminView({
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Squad Management</h3>
-              <SquadManager squad={squad} onUpdate={onUpdateSquad} />
-            </div>
-          </motion.div>
-        )}
-        {activeTab === 'passwords' && (
-          <motion.div key="passwords" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-              <div className="space-y-1">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Admin Passwords</h3>
-                <p className="text-[9px] text-slate-300 font-bold uppercase">Coach and Manager login passwords</p>
-              </div>
-              <div className="space-y-3">
-                {[{ label: 'Coach', key: 'coach' }, { label: 'Manager', key: 'manager' }].filter(({ key }) => userName !== 'Coach' || key === 'coach').map(({ label, key }) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase text-slate-500 w-20 shrink-0">{label}</span>
-                    <input
-                      key={`${key}-${passwords?.[key]}`}
-                      type="text"
-                      defaultValue={passwords?.[key] || ''}
-                      onBlur={(e) => onUpdatePasswords({ ...passwords, [key]: e.target.value.trim() || passwords?.[key] })}
-                      className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy font-mono"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Player Passwords</h3>
-                <p className="text-[9px] text-slate-300 font-bold uppercase">Default login password for each player</p>
-              </div>
-              <div className="space-y-2">
-                {squad.map((player: any) => (
-                  <div key={player.name} className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase text-slate-500 w-24 shrink-0 truncate">{player.name}</span>
-                    <input
-                      key={`${player.name}-${passwords?.players?.[player.name]}`}
-                      type="text"
-                      defaultValue={passwords?.players?.[player.name] || ''}
-                      onBlur={(e) => onUpdatePasswords({ ...passwords, players: { ...passwords?.players, [player.name]: e.target.value.trim() || passwords?.players?.[player.name] } })}
-                      className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy font-mono"
-                    />
-                  </div>
-                ))}
               </div>
             </div>
           </motion.div>
