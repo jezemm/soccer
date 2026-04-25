@@ -70,7 +70,9 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const [apiCafes, setApiCafes] = useState<NearbyCafe[] | null>(null);
   const [cafesLoading, setCafesLoading] = useState(false);
 
-  const venueName = getVenueName(game.location || '');
+  // Use homeGround as fallback so the section shows for home games too
+  const gameLocation = game.location || homeGround || '';
+  const venueName = getVenueName(gameLocation);
   useEffect(() => {
     if (!venueName) return;
     setCafesLoading(true);
@@ -81,7 +83,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
       .finally(() => setCafesLoading(false));
   }, [venueName]);
 
-  const allCafes = apiCafes ?? getCafesForLocation(game.location || '');
+  const allCafes = apiCafes ?? getCafesForLocation(gameLocation);
   const nearbyCafes = sortCafes(allCafes, cafeSort, 3);
 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -205,7 +207,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         </div>
       </div>
 
-      {game.location && (
+      {gameLocation && (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 shrink-0">
@@ -258,7 +260,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                     </a>
                   </div>
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(gameLocation) + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`flex items-center justify-center gap-2 w-full text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all ${i === 0 ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-900/20' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'} active:scale-[0.98]`}
@@ -275,16 +277,16 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 We don't have curated cafe picks for this venue yet — but Google Maps has you covered.
               </p>
               <a
-                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}`}
+                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(getVenueName(gameLocation) + ' Melbourne VIC')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
               >
                 <Coffee className="w-3.5 h-3.5" />
-                Find Cafes Near {getVenueName(game.location)}
+                Find Cafes Near {getVenueName(gameLocation)}
               </a>
               <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&travelmode=driving`}
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(gameLocation) + ' Melbourne VIC')}&travelmode=driving`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all"

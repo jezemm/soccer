@@ -267,6 +267,246 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
   );
 }
 
+// ── Short name helpers ────────────────────────────────────────────────────────
+
+/** Extract the EMJSC team identifier from a full Dribl team string. */
+function emjscShortName(fullName: string): string {
+  const m = fullName.match(/EMJS[C]?\s+(.*)/i);
+  return m ? m[1].trim() : fullName;
+}
+
+/** Best-effort short club name for the opponent column. */
+function opponentShort(fullName: string): string {
+  // Strip everything from " U0" onwards (e.g. " U08 MiniRoos - Joeys Mixed ...")
+  return fullName.replace(/\s+U\d{2}\s+.*/i, '').trim();
+}
+
+// ── DriblScrapePanel ──────────────────────────────────────────────────────────
+
+type ScrapePhase =
+  | { tag: 'idle' }
+  | { tag: 'scraping' }
+  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string }
+  | { tag: 'syncing' }
+  | { tag: 'done'; count: number }
+  | { tag: 'error'; message: string };
+
+function DriblScrapePanel({ onFetchDribl, onConfirmSync }: {
+  onFetchDribl: () => Promise<{ fixtures: any[]; debug: any } | null>;
+  onConfirmSync: (fixtures: any[], teamName: string) => Promise<void>;
+}) {
+  const [phase, setPhase] = React.useState<ScrapePhase>({ tag: 'idle' });
+
+  const startScrape = async () => {
+    setPhase({ tag: 'scraping' });
+    try {
+      const result = await onFetchDribl();
+      if (!result || result.fixtures.length === 0) {
+        setPhase({ tag: 'error', message: 'Scrape returned no fixtures. Check server logs.' });
+        return;
+      }
+      // Collect unique EMJSC team names from home + away columns
+      const teamSet = new Set<string>();
+      for (const f of result.fixtures) {
+        for (const name of [f.home_team_name, f.away_team_name]) {
+          if (name && /east malvern|emjsc|emjs/i.test(name)) teamSet.add(name);
+        }
+      }
+      const emjscTeams = Array.from(teamSet).sort();
+      const selectedTeam = emjscTeams[0] ?? '';
+      setPhase({ tag: 'preview', allFixtures: result.fixtures, emjscTeams, selectedTeam });
+    } catch (err: any) {
+      setPhase({ tag: 'error', message: err?.message || 'Unknown error' });
+    }
+  };
+
+  const confirmSync = async () => {
+    if (phase.tag !== 'preview') return;
+    const { allFixtures, selectedTeam } = phase;
+    setPhase({ tag: 'syncing' });
+    try {
+      await onConfirmSync(allFixtures, selectedTeam);
+      const count = allFixtures.filter(f =>
+        (f.home_team_name || '').includes(selectedTeam) ||
+        (f.away_team_name || '').includes(selectedTeam)
+      ).length;
+      setPhase({ tag: 'done', count });
+      setTimeout(() => setPhase({ tag: 'idle' }), 4000);
+    } catch (err: any) {
+      setPhase({ tag: 'error', message: err?.message || 'Sync failed' });
+    }
+  };
+
+  // ── Idle ──
+  if (phase.tag === 'idle') return (
+    <button
+      onClick={startScrape}
+      className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3"
+    >
+      <Zap className="w-4 h-4 text-yellow-300" />
+      Scrape Dribl — Fixtures, Logos &amp; Maps
+    </button>
+  );
+
+  // ── Scraping ──
+  if (phase.tag === 'scraping') return (
+    <div className="w-full bg-emjsc-navy/10 border border-emjsc-navy/20 rounded-2xl p-5 flex items-center gap-3">
+      <RefreshCw className="w-4 h-4 text-emjsc-navy animate-spin shrink-0" />
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Scraping Dribl…</p>
+        <p className="text-[9px] text-slate-400 font-medium mt-0.5">Loading all pages — this takes ~30s</p>
+      </div>
+    </div>
+  );
+
+  // ── Error ──
+  if (phase.tag === 'error') return (
+    <div className="space-y-3">
+      <div className="w-full bg-red-50 border border-red-200 rounded-2xl p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emjsc-red mb-1">Scrape Failed</p>
+        <p className="text-[10px] text-red-700 font-medium">{phase.message}</p>
+      </div>
+      <button onClick={() => setPhase({ tag: 'idle' })} className="w-full bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200">
+        Try Again
+      </button>
+    </div>
+  );
+
+  // ── Done ──
+  if (phase.tag === 'done') return (
+    <div className="w-full bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+      <Check className="w-5 h-5 text-green-600 shrink-0" />
+      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-green-700">
+        {phase.count} fixture{phase.count !== 1 ? 's' : ''} saved to database
+      </p>
+    </div>
+  );
+
+  // ── Syncing ──
+  if (phase.tag === 'syncing') return (
+    <div className="w-full bg-emjsc-navy/10 border border-emjsc-navy/20 rounded-2xl p-5 flex items-center gap-3">
+      <RefreshCw className="w-4 h-4 text-emjsc-navy animate-spin shrink-0" />
+      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Saving to database…</p>
+    </div>
+  );
+
+  // ── Preview ──
+  const { allFixtures, emjscTeams, selectedTeam } = phase;
+  const teamFixtures = allFixtures
+    .filter(f =>
+      (f.home_team_name || '').includes(selectedTeam) ||
+      (f.away_team_name || '').includes(selectedTeam)
+    )
+    .sort((a, b) => Number(a.round) - Number(b.round));
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">
+            {allFixtures.length} fixtures scraped
+          </p>
+          <p className="text-[9px] text-slate-400 font-medium mt-0.5">Select a team to preview and save</p>
+        </div>
+        <button onClick={() => setPhase({ tag: 'idle' })} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <X className="w-4 h-4 text-slate-400" />
+        </button>
+      </div>
+
+      {/* Team selector */}
+      <select
+        value={selectedTeam}
+        onChange={e => setPhase({ ...phase, selectedTeam: e.target.value })}
+        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
+      >
+        {emjscTeams.map(t => (
+          <option key={t} value={t}>{emjscShortName(t)}</option>
+        ))}
+      </select>
+
+      {/* Fixture preview table */}
+      {teamFixtures.length === 0 ? (
+        <p className="text-[10px] text-slate-400 font-medium text-center py-4">No fixtures found for this team</p>
+      ) : (
+        <div className="border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="max-h-72 overflow-y-auto">
+            <table className="w-full text-left">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Rd</th>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Date</th>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">KO</th>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">H/A</th>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Opponent</th>
+                  <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Venue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {teamFixtures.map((f, i) => {
+                  const isHome = (f.home_team_name || '').includes(selectedTeam);
+                  const opponent = isHome ? f.away_team_name : f.home_team_name;
+                  const oppLogo = isHome ? f.away_team_logo : f.home_team_logo;
+                  const dateStr = f.date
+                    ? new Date(f.date + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+                    : '—';
+                  return (
+                    <tr key={i} className="hover:bg-slate-50/50">
+                      <td className="px-3 py-2.5 text-[10px] font-black text-emjsc-navy">{f.round ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-[10px] font-semibold text-slate-600 whitespace-nowrap">{dateStr}</td>
+                      <td className="px-3 py-2.5 text-[10px] font-semibold text-slate-600">{f.time ?? '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${isHome ? 'bg-emjsc-navy/10 text-emjsc-navy border-emjsc-navy/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                          {isHome ? 'H' : 'A'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {oppLogo && (
+                            <img src={oppLogo} alt="" className="w-5 h-5 object-contain rounded shrink-0"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          )}
+                          <span className="text-[10px] font-semibold text-slate-700 truncate max-w-[120px]">
+                            {opponentShort(opponent ?? '—')}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-[9px] text-slate-500 truncate max-w-[140px]">
+                        {f.venue ?? '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
+            <p className="text-[9px] font-bold text-slate-400">{teamFixtures.length} fixtures · logos &amp; map links included</p>
+          </div>
+        </div>
+      )}
+
+      {/* Action row */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPhase({ tag: 'idle' })}
+          className="flex-1 bg-slate-100 text-slate-500 text-[10px] font-black uppercase py-3.5 rounded-2xl border border-slate-200 active:scale-[0.98] transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmSync}
+          disabled={teamFixtures.length === 0}
+          className="flex-[2] bg-emjsc-navy text-white text-[10px] font-black uppercase py-3.5 rounded-2xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          <CalendarDays className="w-4 h-4" />
+          Save {teamFixtures.length} Fixture{teamFixtures.length !== 1 ? 's' : ''} to Database
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminView({
   userName,
   games,
@@ -288,7 +528,8 @@ export function AdminView({
   onUpdateHomeGround,
   onRefreshTravelTimes,
   onBulkSync,
-  onScrapeDribl,
+  onFetchDribl,
+  onConfirmSync,
   onClearSchedule,
   onDeleteGame,
   coachChild,
@@ -483,15 +724,7 @@ export function AdminView({
 
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fixture Integration</h3>
-
-              {/* Playwright scraper — fetches logos + map links from Dribl web page */}
-              <button
-                onClick={onScrapeDribl}
-                className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3"
-              >
-                <Zap className="w-4 h-4 text-yellow-300" />
-                Scrape Dribl — Sync Fixtures, Logos &amp; Maps
-              </button>
+              <DriblScrapePanel onFetchDribl={onFetchDribl} onConfirmSync={onConfirmSync} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

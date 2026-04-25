@@ -1206,7 +1206,7 @@ export default function App() {
     return null;
   };
 
-  const bulkSyncFixtures = async (jsonContent: string | object) => {
+  const bulkSyncFixtures = async (jsonContent: string | object, overrideTeamName?: string) => {
     if (!isAdmin) return;
     setAdminActionStatus('Syncing fixtures...');
     let syncedCount = 0;
@@ -1225,7 +1225,7 @@ export default function App() {
         throw new Error(`No fixtures array found. Top-level keys: ${keys || '(empty)'}`);
       }
 
-      const teamName = "EMJSC U8 Saturday White";
+      const teamName = overrideTeamName || "EMJSC U8 Saturday White";
 
       for (const f of fixtures) {
         const attrs = f.attributes || f;
@@ -1305,29 +1305,23 @@ export default function App() {
   };
 
 
-  const scrapeDriblAndSync = async () => {
-    if (!isAdmin) return;
-    setAdminActionStatus('Launching browser scraper…');
+  const fetchDriblFixtures = async (): Promise<{ fixtures: any[]; debug: any } | null> => {
+    if (!isAdmin) return null;
     try {
       const res = await fetch('/api/scrape-dribl');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const { fixtures, debug } = await res.json();
-      console.log('[scrape-dribl] debug:', debug);
-      if (!fixtures || fixtures.length === 0) {
-        setAdminActionStatus('Scrape returned no fixtures — check browser console for debug info');
-        setTimeout(() => setAdminActionStatus(null), 8000);
-        return;
-      }
-      setAdminActionStatus(`Scraped ${fixtures.length} fixture(s) — writing to database…`);
-      await bulkSyncFixtures({ data: fixtures });
+      return await res.json();
     } catch (err: any) {
       console.error("Scrape error:", err);
-      setAdminActionStatus(`Scrape failed: ${err?.message || 'unknown error'}`);
-      setTimeout(() => setAdminActionStatus(null), 8000);
+      throw err;
     }
+  };
+
+  const confirmSyncFixtures = async (fixtures: any[], teamName: string) => {
+    await bulkSyncFixtures({ data: fixtures }, teamName);
   };
 
   const refreshTravelTimes = async () => {
@@ -2501,7 +2495,8 @@ export default function App() {
                           onUpdateHomeGround={updateHomeGround}
                           onRefreshTravelTimes={refreshTravelTimes}
                           onBulkSync={bulkSyncFixtures}
-                          onScrapeDribl={scrapeDriblAndSync}
+                          onFetchDribl={fetchDriblFixtures}
+                          onConfirmSync={confirmSyncFixtures}
                           coachChild={coachChild}
                           onUpdateCoachChild={updateCoachChild}
                           coachExemptDuties={coachExemptDuties}

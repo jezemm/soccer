@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execFile } from "child_process";
 import axios from "axios";
 import dotenv from "dotenv";
 
@@ -60,6 +61,30 @@ async function startServer() {
       console.error("Travel Time Error:", error.message);
       res.status(500).json({ error: "Failed to fetch from Google Maps" });
     }
+  });
+
+  // Playwright scraper for Dribl fixture page (logos + map links).
+  // Spawns a child Node process to avoid ESM/tsx dynamic-import issues.
+  app.get("/api/scrape-dribl", (req, res) => {
+    const scriptPath = path.join(__dirname, 'scripts', 'scrape-dribl.mjs');
+    console.log('[scrape-dribl] spawning:', scriptPath);
+
+    execFile('node', [scriptPath, '--json'], {
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      if (stderr) console.error('[scrape-dribl stderr]', stderr.substring(0, 500));
+      if (err) {
+        console.error('[scrape-dribl] child error:', err.message);
+        return res.status(500).json({ error: err.message || 'Scrape failed' });
+      }
+      try {
+        res.json(JSON.parse(stdout.trim()));
+      } catch (parseErr: any) {
+        console.error('[scrape-dribl] parse error. stdout:', stdout.substring(0, 200));
+        res.status(500).json({ error: 'Failed to parse scraper output' });
+      }
+    });
   });
 
   // Proxy for Dribl Fixtures API
