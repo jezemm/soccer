@@ -130,19 +130,37 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
             <tbody className="divide-y divide-slate-100">
               {staffAccounts.map((a: any, i: number) => editingStaffIdx === i ? (
                 <tr key={a.id} className="bg-blue-50">
-                  <td className="px-3 py-2"><input autoFocus value={editStaffName} onChange={e => setEditStaffName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" /></td>
-                  <td className="px-3 py-2 hidden md:table-cell">
-                    <select value={editStaffRole} onChange={e => setEditStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
-                      <option value="coach">Coach</option>
-                      <option value="manager">Manager</option>
-                    </select>
+                  <td colSpan={isManager ? 5 : 4} className="px-3 py-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Name</p>
+                          <input autoFocus value={editStaffName} onChange={e => setEditStaffName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" />
+                        </div>
+                        <div className="w-28">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Role</p>
+                          <select value={editStaffRole} onChange={e => setEditStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
+                            <option value="coach">Coach</option>
+                            <option value="manager">Manager</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Description</p>
+                        <input value={editStaffTagline} onChange={e => setEditStaffTagline(e.target.value)} placeholder="Description shown on Squad page…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" />
+                      </div>
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Password</p>
+                          <input value={editStaffPass} onChange={e => setEditStaffPass(e.target.value)} placeholder="New password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono" />
+                        </div>
+                        <div className="flex gap-1 pb-0.5">
+                          <button onClick={saveEditStaff} className="p-1.5 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                          <button onClick={() => setEditingStaffIdx(null)} className="p-1.5 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                        </div>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-3 py-2 hidden sm:table-cell"><input value={editStaffTagline} onChange={e => setEditStaffTagline(e.target.value)} placeholder="Description shown on Squad page…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" /></td>
-                  <td className="px-3 py-2"><input value={editStaffPass} onChange={e => setEditStaffPass(e.target.value)} placeholder="New password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono" /></td>
-                  <td className="px-2 py-2"><div className="flex gap-1">
-                    <button onClick={saveEditStaff} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
-                    <button onClick={() => setEditingStaffIdx(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
-                  </div></td>
                 </tr>
               ) : (
                 <tr key={a.id} className="bg-white hover:bg-slate-50 transition-colors">
@@ -193,25 +211,32 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
             <tbody className="divide-y divide-slate-100">
               {squad.map((p: any, i: number) => editingIdx === i ? (
                 <tr key={i} className="bg-blue-50">
-                  <td className="px-3 py-2">
-                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" />
-                  </td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
-                    <input value={editFact} onChange={e => setEditFact(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      key={`${p.name}-${passwords?.players?.[p.name]}`}
-                      type="text"
-                      defaultValue={passwords?.players?.[p.name] || ''}
-                      onBlur={(e) => onUpdatePasswords({ ...passwords, players: { ...passwords?.players, [p.name]: e.target.value.trim() || passwords?.players?.[p.name] } })}
-                      className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <div className="flex gap-1">
-                      <button onClick={saveEdit} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setEditingIdx(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                  <td colSpan={4} className="px-3 py-3">
+                    <div className="flex flex-col gap-2">
+                      <div>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Name</p>
+                        <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Tagline</p>
+                        <input value={editFact} onChange={e => setEditFact(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" />
+                      </div>
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Password</p>
+                          <input
+                            key={`${p.name}-${passwords?.players?.[p.name]}`}
+                            type="text"
+                            defaultValue={passwords?.players?.[p.name] || ''}
+                            onBlur={(e) => onUpdatePasswords({ ...passwords, players: { ...passwords?.players, [p.name]: e.target.value.trim() || passwords?.players?.[p.name] } })}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono"
+                          />
+                        </div>
+                        <div className="flex gap-1 pb-0.5">
+                          <button onClick={saveEdit} className="p-1.5 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
+                          <button onClick={() => setEditingIdx(null)} className="p-1.5 bg-slate-200 text-slate-600 rounded-lg"><X className="w-3 h-3" /></button>
+                        </div>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -393,7 +418,7 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         }
       }
       const emjscTeams = Array.from(teamSet).sort();
-      const selectedTeam = emjscTeams[0] ?? '';
+      const selectedTeam = emjscTeams.find(t => /saturday white/i.test(t)) ?? emjscTeams[0] ?? '';
       const cache: DriblCache = { fixtures: result.fixtures, emjscTeams, selectedTeam, savedAt: new Date().toISOString() };
       await onSaveDriblCache(cache);
       setPhase({ tag: 'preview', allFixtures: result.fixtures, emjscTeams, selectedTeam, cachedAt: cache.savedAt });
