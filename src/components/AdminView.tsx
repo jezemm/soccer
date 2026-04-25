@@ -319,6 +319,7 @@ export function AdminView({
   onUpdateStaff,
   featureRequests = [],
   onMarkFeatureReviewed,
+  onDeleteFeatureRequest,
   notificationSettings = {},
   onUpdateNotificationSettings,
 }: any) {
@@ -649,15 +650,24 @@ export function AdminView({
                           </div>
                           <p className="text-xs text-slate-700 font-medium leading-relaxed">{req.description}</p>
                         </div>
-                        {req.status !== 'reviewed' && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {req.status !== 'reviewed' && (
+                            <button
+                              onClick={() => onMarkFeatureReviewed(req.id)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-[8px] font-black uppercase rounded-xl active:scale-95 transition-all"
+                            >
+                              <Check className="w-3 h-3" />
+                              Done
+                            </button>
+                          )}
                           <button
-                            onClick={() => onMarkFeatureReviewed(req.id)}
-                            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-[8px] font-black uppercase rounded-xl active:scale-95 transition-all"
+                            onClick={() => onDeleteFeatureRequest(req.id)}
+                            className="p-1.5 text-emjsc-red hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
                           >
-                            <Check className="w-3 h-3" />
-                            Done
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   ))}

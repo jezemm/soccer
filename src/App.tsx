@@ -463,6 +463,14 @@ export default function App() {
     }
   };
 
+  const handleDeleteFeatureRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'featureRequests', id));
+    } catch (e) {
+      console.error('Delete feature request error:', e);
+    }
+  };
+
   const handleUpdateNotificationSettings = async (settings: NotificationSettings) => {
     if (!isAdmin) return;
     setNotificationSettings(settings);
@@ -2390,6 +2398,7 @@ export default function App() {
                           onUpdateStaff={handleUpdateStaff}
                           featureRequests={featureRequests}
                           onMarkFeatureReviewed={handleMarkFeatureReviewed}
+                          onDeleteFeatureRequest={handleDeleteFeatureRequest}
                           notificationSettings={notificationSettings}
                           onUpdateNotificationSettings={handleUpdateNotificationSettings}
                         />
