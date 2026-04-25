@@ -185,7 +185,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
               className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-slate-100 bg-white shadow-sm active:scale-95 transition-all"
             >
               <div className={`w-10 h-5 rounded-full relative transition-colors duration-200 ${isUnavailable ? 'bg-red-400' : 'bg-green-400'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${isUnavailable ? 'left-5' : 'left-0.5'}`} />
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${isUnavailable ? 'left-0.5' : 'left-5'}`} />
               </div>
               <span className={`text-[10px] font-black uppercase tracking-widest ${isUnavailable ? 'text-red-600' : 'text-green-700'}`}>
                 {isUnavailable ? 'Unavailable to Play' : 'Available to Play'}

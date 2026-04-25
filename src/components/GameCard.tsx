@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
+import { Navigation, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName } from '../lib/constants';
 
@@ -149,18 +149,18 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 group/loc w-fit"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
           >
-            <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
-            <p className="text-[9px] text-slate-500 font-bold uppercase truncate tracking-tight group-hover/loc:text-emjsc-red transition-colors">{formatVenueDisplay(game.location)}</p>
+            <Navigation className="w-3 h-3 text-emjsc-red shrink-0" />
+            <span className="text-[9px] text-emjsc-navy font-black uppercase tracking-tight">Navigate to {venueName}</span>
           </a>
           {onToggleAvailability && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleAvailability(userName, dateKey); }}
-              className="flex items-center gap-1.5 active:scale-95 transition-all mt-2.5"
+              className="flex items-center gap-1.5 active:scale-95 transition-all mt-4"
             >
               <div className={`w-8 h-4 rounded-full relative transition-colors duration-200 ${isUnavailable ? 'bg-red-400' : 'bg-green-400'}`}>
-                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-200 ${isUnavailable ? 'left-4' : 'left-0.5'}`} />
+                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-200 ${isUnavailable ? 'left-0.5' : 'left-4'}`} />
               </div>
               <span className={`text-[9px] font-black uppercase ${isUnavailable ? 'text-red-600' : 'text-green-700'}`}>
                 {isUnavailable ? 'Unavailable to Play' : 'Available to Play'}
