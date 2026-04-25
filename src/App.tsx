@@ -112,7 +112,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [gamesLoaded, setGamesLoaded] = useState(false);
   const [games, setGames] = useState<GameType[]>([]);
-  const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [squad, setSquad] = useState<{ name: string; fact: string }[]>(TEAM_SQUAD);
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,15 +119,17 @@ export default function App() {
     '/': 'fixtures', '/schedule': 'fixtures', '/squad': 'squad',
     '/admin': 'admin', '/messages': 'messages', '/help': 'help',
   };
-  const routeView = PATH_TO_VIEW[location.pathname] ?? 'fixtures';
-  const view = (routeView === 'fixtures' && selectedGame) ? 'game' : routeView;
+  const gameIdFromPath = location.pathname.startsWith('/game/')
+    ? location.pathname.slice('/game/'.length)
+    : null;
+  const view = gameIdFromPath ? 'game' : (PATH_TO_VIEW[location.pathname] ?? 'fixtures');
+  const selectedGame = gameIdFromPath ? (games.find(g => g.id === gameIdFromPath) ?? null) : null;
   const setView = (v: string) => {
     const VIEW_TO_PATH: Record<string, string> = {
       fixtures: '/schedule', squad: '/squad', admin: '/admin', messages: '/messages', help: '/help',
     };
     if (v === 'game') return;
     navigate(VIEW_TO_PATH[v] ?? '/schedule');
-    if (v !== 'fixtures') setSelectedGame(null);
   };
   const [editingSkills, setEditingSkills] = useState<string | null>(null);
   const DEFAULT_PLAYER_PASSWORDS: Record<string, string> = {
@@ -1514,18 +1515,18 @@ export default function App() {
       <div className="mobile-container relative bg-slate-50 md:flex md:gap-8 md:items-start">
         {/* Desktop Sidebar Navigation */}
         <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-white border-r border-slate-200 p-6 space-y-8 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <img 
-              src={CLUB_LOGO} 
-              alt="Logo" 
-              className="w-10 h-10 object-contain" 
+          <button onClick={() => navigate('/schedule')} className="flex items-center gap-3 mb-4 group active:scale-95 transition-transform text-left">
+            <img
+              src={CLUB_LOGO}
+              alt="Logo"
+              className="w-10 h-10 object-contain group-hover:scale-105 transition-transform"
               referrerPolicy="no-referrer"
             />
             <div>
               <h1 className="text-lg font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
               <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-1">U8 White Saturday</p>
             </div>
-          </div>
+          </button>
 
           <nav className="flex flex-col gap-2">
             <DesktopNavButton active={view === 'fixtures' || view === 'game'} onClick={() => setView('fixtures')} icon={<Calendar className="w-5 h-5" />} label="Schedule" />
@@ -1565,19 +1566,19 @@ export default function App() {
           {/* Mobile Header (Hidden on Desktop) */}
           <header className="md:hidden bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-[60]">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={CLUB_LOGO} 
-                  alt="Logo" 
-                  className="w-8 h-8 object-contain" 
+              <button onClick={() => navigate('/schedule')} className="flex items-center gap-3 active:scale-95 transition-transform">
+                <img
+                  src={CLUB_LOGO}
+                  alt="Logo"
+                  className="w-8 h-8 object-contain"
                   referrerPolicy="no-referrer"
                 />
                 <div>
                   <h1 className="text-sm font-black tracking-tight text-emjsc-navy leading-none uppercase">
-                    {view === 'fixtures' ? 'Fixture' : view === 'squad' ? 'Squad' : view === 'admin' ? 'Admin' : view === 'messages' ? 'Messages' : 'Game'}
+                    {view === 'fixtures' ? 'Fixture' : view === 'squad' ? 'Squad' : view === 'admin' ? 'Admin' : view === 'messages' ? 'Messages' : view === 'game' ? 'Match' : 'Hub'}
                   </h1>
                 </div>
-              </div>
+              </button>
               
               <div className="flex items-center gap-2">
                 <button 
@@ -1627,20 +1628,87 @@ export default function App() {
           </header>
 
           {/* Desktop Content Header (Hidden on Mobile) */}
-          <header className="hidden md:flex items-center justify-between px-8 py-10">
+          <header className="hidden md:flex flex-col px-8 pt-10 pb-6 gap-2">
+            {(() => {
+              const crumbs: { label: string; path?: string }[] = [{ label: 'Schedule', path: '/schedule' }];
+              if (view === 'squad') crumbs.push({ label: 'Squad' });
+              else if (view === 'admin') crumbs.push({ label: 'Admin Hub' });
+              else if (view === 'messages') crumbs.push({ label: 'Messages' });
+              else if (view === 'help') crumbs.push({ label: 'Help & FAQ' });
+              else if (view === 'game' && selectedGame) {
+                const { club, team } = splitOpponent(selectedGame.opponent);
+                crumbs.push({ label: `Vs ${club || team}` });
+              } else {
+                crumbs[0] = { label: 'Schedule' };
+              }
+              const isHome = crumbs.length === 1;
+              if (isHome) return null;
+              return (
+                <nav className="flex items-center gap-1.5">
+                  {crumbs.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />}
+                      {crumb.path ? (
+                        <button onClick={() => navigate(crumb.path!)} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy transition-colors">
+                          {crumb.label}
+                        </button>
+                      ) : (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emjsc-navy">{crumb.label}</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </nav>
+              );
+            })()}
             <div>
               <h1 className="text-4xl font-black tracking-tighter text-emjsc-navy uppercase leading-none mb-1">
-                {view === 'fixtures' ? 'Match Schedule' : view === 'squad' ? 'The Squad' : view === 'admin' ? 'Admin Hub' : view === 'profile' ? 'My Profile' : view === 'messages' ? 'Messages' : 'Game Details'}
+                {view === 'fixtures' ? 'Match Schedule'
+                  : view === 'squad' ? 'The Squad'
+                  : view === 'admin' ? 'Admin Hub'
+                  : view === 'profile' ? 'My Profile'
+                  : view === 'messages' ? 'Messages'
+                  : view === 'help' ? 'Help & FAQ'
+                  : view === 'game' && selectedGame
+                    ? (() => { const { club, team } = splitOpponent(selectedGame.opponent); return `Vs ${club || team}`; })()
+                    : 'Match Details'}
               </h1>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">{userName} • EMJSC U8 Saturday White</p>
             </div>
-            {view === 'game' && (
-              null
-            )}
           </header>
 
           {/* Content */}
           <main className="px-6 py-4 md:px-8 md:py-0 pb-24 md:pb-12">
+            {/* Breadcrumbs — mobile only (desktop shows in header) */}
+            {(() => {
+              const crumbs: { label: string; path?: string }[] = [{ label: 'Schedule', path: '/schedule' }];
+              if (view === 'squad') crumbs.push({ label: 'Squad' });
+              else if (view === 'admin') crumbs.push({ label: 'Admin Hub' });
+              else if (view === 'messages') crumbs.push({ label: 'Messages' });
+              else if (view === 'help') crumbs.push({ label: 'Help & FAQ' });
+              else if (view === 'game' && selectedGame) {
+                const { club, team } = splitOpponent(selectedGame.opponent);
+                crumbs.push({ label: `Vs ${club || team}` });
+              } else {
+                return null;
+              }
+              if (crumbs.length < 2) return null;
+              return (
+                <nav className="md:hidden flex items-center gap-1.5 mb-4 py-1">
+                  {crumbs.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />}
+                      {crumb.path ? (
+                        <button onClick={() => navigate(crumb.path!)} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-navy transition-colors active:scale-95">
+                          {crumb.label}
+                        </button>
+                      ) : (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emjsc-navy">{crumb.label}</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </nav>
+              );
+            })()}
             <AnimatePresence mode="wait">
               <motion.div
                 key={view}
@@ -1836,7 +1904,7 @@ export default function App() {
                           <section className="space-y-4">
                             <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Next Match</h2>
                             <div
-                              onClick={isInProgress(game) ? undefined : () => setSelectedGame(game)}
+                              onClick={isInProgress(game) ? undefined : () => navigate('/game/' + game.id)}
                               className={`bg-white border-2 border-emjsc-navy rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group transition-all duration-300 ${isInProgress(game) ? 'opacity-50 grayscale cursor-default' : 'cursor-pointer hover:border-emjsc-red'}`}
                             >
                               <div className="absolute top-0 right-0 bg-emjsc-navy text-white px-6 py-2 rounded-bl-3xl font-black uppercase tracking-tighter text-[9px] shadow-lg group-hover:bg-emjsc-red transition-colors flex items-center gap-2">
@@ -2042,7 +2110,7 @@ export default function App() {
                                       onToggleAvailability={isDimmed(game) ? undefined : handleToggleAvailability}
                                       isSyncing={isSyncing}
                                       dimmed={isDimmed(game)}
-                                      onClick={() => setSelectedGame(game)}
+                                      onClick={() => navigate('/game/' + game.id)}
                                     />
                                   ))
                                 )}
@@ -2236,7 +2304,7 @@ export default function App() {
                       feedbacks={feedbacks}
                       availabilities={availabilities}
                       onToggleAvailability={handleToggleAvailability}
-                      onBack={() => setSelectedGame(null)}
+                      onBack={() => navigate('/schedule')}
                       onSignUp={handleSignUp}
                       onRequestSwap={handleRequestSwap}
                       isSyncing={isSyncing}
