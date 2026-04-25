@@ -450,8 +450,10 @@ export default function App() {
       const data: any = { content, type, timestamp: serverTimestamp() };
       if (targetPlayer) data.targetPlayer = targetPlayer;
       await setDoc(newRef, data);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding announcement:", err);
+      setAdminActionStatus(`Save failed: ${err?.code || err?.message || 'unknown error'}`);
+      setTimeout(() => setAdminActionStatus(null), 6000);
     }
   };
 
