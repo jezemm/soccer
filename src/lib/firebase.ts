@@ -98,6 +98,21 @@ export interface FaqItem {
   visibleTo?: string[]; // 'player' | 'coach' | 'manager' — undefined means all
 }
 
+export interface FeatureRequest {
+  id: string;
+  description: string;
+  submitterName?: string;
+  submittedAt: any;
+  status: 'new' | 'reviewed';
+}
+
+export interface NotificationSettings {
+  adminEmail: string;
+  emailjsServiceId?: string;
+  emailjsTemplateId?: string;
+  emailjsPublicKey?: string;
+}
+
 export interface AppUser {
   displayName: string;
 }

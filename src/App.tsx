@@ -40,11 +40,13 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronLeft,
-  Send
+  Send,
+  Lightbulb
 } from 'lucide-react';
-import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem } from './lib/firebase';
+import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
 import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime } from './lib/constants';
+import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
 import { FaqManager, HelpView } from './components/HelpView';
@@ -161,6 +163,12 @@ export default function App() {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [dutiesConfig, setDutiesConfig] = useState<DutyConfig[]>([]);
   const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
+  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({ adminEmail: 'jeremymarks@gmail.com' });
+  const [showFeatureModal, setShowFeatureModal] = useState(false);
+  const [featureName, setFeatureName] = useState('');
+  const [featureDescription, setFeatureDescription] = useState('');
+  const [featureSubmitStatus, setFeatureSubmitStatus] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
   const [playerLoginCode, setPlayerLoginCode] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<string | null>(null); // gameId-dutyId
@@ -291,6 +299,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'featureRequests'),
+      (snapshot) => {
+        const r = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FeatureRequest));
+        setFeatureRequests(r);
+      },
+      (err) => console.error('Feature requests subscription error:', err)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'notifications'), (snapshot) => {
+      if (snapshot.exists()) {
+        setNotificationSettings(snapshot.data() as NotificationSettings);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'passwords'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -382,6 +411,65 @@ export default function App() {
       setFaqItems(SEED_FAQS as any[]);
       await batch.commit();
     } catch (e) { console.error('Reset FAQ error:', e); }
+  };
+
+  const handleSubmitFeatureRequest = async () => {
+    if (!featureDescription.trim()) return;
+    setFeatureSubmitStatus('submitting');
+    try {
+      const id = `fr_${Date.now()}`;
+      const data = {
+        description: featureDescription.trim(),
+        submitterName: featureName.trim() || undefined,
+        submittedAt: serverTimestamp(),
+        status: 'new' as const,
+      };
+      await setDoc(doc(db, 'featureRequests', id), data);
+
+      const { adminEmail, emailjsServiceId, emailjsTemplateId, emailjsPublicKey } = notificationSettings;
+      if (emailjsServiceId && emailjsTemplateId && emailjsPublicKey && adminEmail) {
+        try {
+          await emailjs.send(emailjsServiceId, emailjsTemplateId, {
+            to_email: adminEmail,
+            from_name: featureName.trim() || 'Anonymous',
+            message: featureDescription.trim(),
+            app_name: 'EMJSC Hub',
+          }, emailjsPublicKey);
+        } catch (emailErr) {
+          console.error('EmailJS send failed (non-fatal):', emailErr);
+        }
+      }
+
+      setFeatureSubmitStatus('done');
+      setFeatureName('');
+      setFeatureDescription('');
+      setTimeout(() => {
+        setShowFeatureModal(false);
+        setFeatureSubmitStatus('idle');
+      }, 1800);
+    } catch (e) {
+      console.error('Submit feature request error:', e);
+      setFeatureSubmitStatus('error');
+      setTimeout(() => setFeatureSubmitStatus('idle'), 3000);
+    }
+  };
+
+  const handleMarkFeatureReviewed = async (id: string) => {
+    try {
+      await setDoc(doc(db, 'featureRequests', id), { status: 'reviewed' }, { merge: true });
+    } catch (e) {
+      console.error('Mark reviewed error:', e);
+    }
+  };
+
+  const handleUpdateNotificationSettings = async (settings: NotificationSettings) => {
+    if (!isAdmin) return;
+    setNotificationSettings(settings);
+    try {
+      await setDoc(doc(db, 'settings', 'notifications'), settings);
+    } catch (e) {
+      console.error('Update notification settings error:', e);
+    }
   };
 
   const handleSendMessage = async (receiver: string, content: string) => {
@@ -1446,6 +1534,7 @@ export default function App() {
               <DesktopNavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
             )}
             <DesktopNavButton active={view === 'help'} onClick={() => setView('help')} icon={<HelpCircle className="w-5 h-5" />} label="Help" />
+            <DesktopNavButton active={false} onClick={() => setShowFeatureModal(true)} icon={<Lightbulb className="w-5 h-5" />} label="Request Feature" />
             {isAdmin && <DesktopNavButton active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings className="w-5 h-5" />} label="Admin" />}
           </nav>
 
@@ -1515,6 +1604,7 @@ export default function App() {
                     <MobileNavItem active={view === 'messages'} onClick={() => { setView('messages'); setMobileMenuOpen(false); }} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
                   )}
                   <MobileNavItem active={view === 'help'} onClick={() => { setView('help'); setMobileMenuOpen(false); }} icon={<HelpCircle className="w-5 h-5" />} label="Help & FAQ" />
+                  <MobileNavItem active={false} onClick={() => { setShowFeatureModal(true); setMobileMenuOpen(false); }} icon={<Lightbulb className="w-5 h-5" />} label="Request a Feature" />
                   {isAdmin && <MobileNavItem active={view === 'admin'} onClick={() => { setView('admin'); setMobileMenuOpen(false); }} icon={<Settings className="w-5 h-5" />} label="Admin Hub" />}
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
@@ -2229,6 +2319,10 @@ export default function App() {
                           userRole={userRole}
                           staffAccounts={staffAccounts}
                           onUpdateStaff={handleUpdateStaff}
+                          featureRequests={featureRequests}
+                          onMarkFeatureReviewed={handleMarkFeatureReviewed}
+                          notificationSettings={notificationSettings}
+                          onUpdateNotificationSettings={handleUpdateNotificationSettings}
                         />
                   </div>
                 )}
@@ -2246,6 +2340,87 @@ export default function App() {
               </motion.div>
             </AnimatePresence>
           </main>
+
+          {/* Feature Request Modal */}
+          <AnimatePresence>
+            {showFeatureModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+              >
+                <div className="absolute inset-0 bg-black/50" onClick={() => { if (featureSubmitStatus !== 'submitting') setShowFeatureModal(false); }} />
+                <motion.div
+                  initial={{ y: 60, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 60, opacity: 0 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                  className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md mx-0 sm:mx-4 p-6 space-y-5 shadow-2xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center">
+                      <Lightbulb className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black uppercase tracking-tight text-emjsc-navy leading-none">Request a Feature</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Help us improve the EMJSC Hub</p>
+                    </div>
+                    <button onClick={() => setShowFeatureModal(false)} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {featureSubmitStatus === 'done' ? (
+                    <div className="py-8 text-center space-y-3">
+                      <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        <Check className="w-7 h-7 text-green-600" />
+                      </div>
+                      <p className="text-sm font-black uppercase text-emjsc-navy">Thanks for the idea!</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Your request has been logged.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Your First Name (optional)</label>
+                        <input
+                          type="text"
+                          value={featureName}
+                          onChange={(e) => setFeatureName(e.target.value)}
+                          placeholder="e.g. Sarah"
+                          className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-emjsc-navy outline-none focus:ring-2 focus:ring-emjsc-navy"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Describe Your Feature Idea <span className="text-emjsc-red">*</span></label>
+                        <textarea
+                          rows={4}
+                          value={featureDescription}
+                          onChange={(e) => setFeatureDescription(e.target.value)}
+                          placeholder="Tell us what you'd like to see in the app..."
+                          className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emjsc-navy resize-none leading-relaxed"
+                        />
+                      </div>
+                      {featureSubmitStatus === 'error' && (
+                        <p className="text-[10px] font-black uppercase text-emjsc-red">Something went wrong. Please try again.</p>
+                      )}
+                      <button
+                        onClick={handleSubmitFeatureRequest}
+                        disabled={!featureDescription.trim() || featureSubmitStatus === 'submitting'}
+                        className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                      >
+                        {featureSubmitStatus === 'submitting' ? (
+                          <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting...</>
+                        ) : (
+                          <><Send className="w-4 h-4" /> Submit Idea</>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Bottom Nav (Hidden on Desktop) */}
           <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">

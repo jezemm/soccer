@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar, Shield, Users, Utensils, MessageCircle, Settings,
   HelpCircle, Lock, Unlock, AlertCircle, Trash2, RefreshCw, Zap,
-  Check, X, Plus
+  Check, X, Plus, Lightbulb, Mail
 } from 'lucide-react';
 import { AdminCommunications } from './AdminCommunications';
 import { AdminModeration } from './AdminModeration';
@@ -317,6 +317,10 @@ export function AdminView({
   userRole,
   staffAccounts = [],
   onUpdateStaff,
+  featureRequests = [],
+  onMarkFeatureReviewed,
+  notificationSettings = {},
+  onUpdateNotificationSettings,
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
   const [activeTab, setActiveTab] = useState('matches');
@@ -358,6 +362,8 @@ export function AdminView({
     );
   }
 
+  const newFeatureCount = (featureRequests as any[]).filter((r: any) => r.status !== 'reviewed').length;
+
   const tabs = [
     { id: 'matches', label: 'Match Day', icon: <Calendar className="w-3 h-3" /> },
     { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
@@ -365,6 +371,7 @@ export function AdminView({
     { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
     { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
     { id: 'faq', label: 'FAQ', icon: <HelpCircle className="w-3 h-3" /> },
+    { id: 'features', label: 'Features', icon: <Lightbulb className="w-3 h-3" />, badge: newFeatureCount },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-3 h-3" /> },
   ];
 
@@ -394,6 +401,9 @@ export function AdminView({
             >
               {tab.icon}
               {tab.label}
+              {(tab as any).badge > 0 && (
+                <span className="bg-emjsc-red text-white text-[7px] font-black rounded-full w-3.5 h-3.5 flex items-center justify-center shrink-0">{(tab as any).badge}</span>
+              )}
             </button>
           ))}
         </div>
@@ -607,6 +617,56 @@ export function AdminView({
           </motion.div>
         )}
 
+        {activeTab === 'features' && (
+          <motion.div key="features" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                  Feature Requests ({(featureRequests as any[]).length})
+                </h3>
+                {newFeatureCount > 0 && (
+                  <span className="text-[9px] font-black uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">{newFeatureCount} new</span>
+                )}
+              </div>
+
+              {(featureRequests as any[]).length === 0 ? (
+                <p className="text-center text-[10px] font-black uppercase text-slate-400 py-8 italic">No feature requests yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {[...(featureRequests as any[])].sort((a, b) => (b.submittedAt?.toMillis?.() ?? 0) - (a.submittedAt?.toMillis?.() ?? 0)).map((req: any) => (
+                    <div key={req.id} className={`p-4 rounded-2xl border space-y-2 ${req.status === 'reviewed' ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-amber-50 border-amber-200'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-[10px] font-black uppercase text-emjsc-navy">{req.submitterName || 'Anonymous'}</span>
+                            <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${req.status === 'reviewed' ? 'bg-slate-200 text-slate-500' : 'bg-amber-500 text-white'}`}>{req.status === 'reviewed' ? 'Reviewed' : 'New'}</span>
+                            {req.submittedAt && (
+                              <span className="text-[8px] text-slate-400 font-bold">
+                                {new Date(req.submittedAt.toDate?.() ?? req.submittedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-700 font-medium leading-relaxed">{req.description}</p>
+                        </div>
+                        {req.status !== 'reviewed' && (
+                          <button
+                            onClick={() => onMarkFeatureReviewed(req.id)}
+                            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-[8px] font-black uppercase rounded-xl active:scale-95 transition-all"
+                          >
+                            <Check className="w-3 h-3" />
+                            Done
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'squad' && (
           <motion.div key="squad" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
@@ -656,6 +716,51 @@ export function AdminView({
                     >
                       {messagingEnabled ? 'Disable' : 'Enable'}
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-50 space-y-4">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 flex items-center gap-2">
+                  <Mail className="w-3 h-3" />
+                  Feature Request Notifications
+                </label>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Admin Email</label>
+                    <input
+                      type="email"
+                      defaultValue={notificationSettings.adminEmail || 'jeremymarks@gmail.com'}
+                      onBlur={(e) => onUpdateNotificationSettings({ ...notificationSettings, adminEmail: e.target.value })}
+                      placeholder="jeremymarks@gmail.com"
+                      className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
+                    />
+                    <p className="text-[8px] text-slate-400 italic px-1 font-bold">Receives an email when a new feature is requested.</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                    <p className="text-[9px] font-black uppercase text-slate-400">EmailJS Config (optional)</p>
+                    <p className="text-[8px] text-slate-400 font-medium leading-relaxed">Create a free account at emailjs.com to enable email notifications. Leave blank to skip emails.</p>
+                    <input
+                      type="text"
+                      defaultValue={notificationSettings.emailjsServiceId || ''}
+                      onBlur={(e) => onUpdateNotificationSettings({ ...notificationSettings, emailjsServiceId: e.target.value })}
+                      placeholder="Service ID (e.g. service_abc123)"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none font-mono"
+                    />
+                    <input
+                      type="text"
+                      defaultValue={notificationSettings.emailjsTemplateId || ''}
+                      onBlur={(e) => onUpdateNotificationSettings({ ...notificationSettings, emailjsTemplateId: e.target.value })}
+                      placeholder="Template ID (e.g. template_xyz789)"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none font-mono"
+                    />
+                    <input
+                      type="text"
+                      defaultValue={notificationSettings.emailjsPublicKey || ''}
+                      onBlur={(e) => onUpdateNotificationSettings({ ...notificationSettings, emailjsPublicKey: e.target.value })}
+                      placeholder="Public Key"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none font-mono"
+                    />
                   </div>
                 </div>
               </div>
