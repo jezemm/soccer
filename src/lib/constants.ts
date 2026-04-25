@@ -282,6 +282,64 @@ export function splitOpponent(name: string): { club: string; team: string } {
   return { club: name.slice(0, idx).trim(), team: name.slice(idx + 3).trim() };
 }
 
+// ---------------------------------------------------------------------------
+// AVATAAARS — URL-based avatar builder (no npm package, just query params)
+// ---------------------------------------------------------------------------
+
+export interface AvatarConfig {
+  topType: string;
+  accessoriesType: string;
+  hairColor: string;
+  facialHairType: string;
+  facialHairColor: string;
+  clotheType: string;
+  clotheColor: string;
+  graphicType: string;
+  eyeType: string;
+  eyebrowType: string;
+  mouthType: string;
+  skinColor: string;
+}
+
+export const AVATAR_OPTIONS = {
+  topType: ['NoHair','ShortHairShortCurly','ShortHairShortFlat','ShortHairShortRound','ShortHairShortWaved','ShortHairTheCaesar','ShortHairDreads01','ShortHairDreads02','ShortHairFrizzle','LongHairBob','LongHairBun','LongHairCurly','LongHairStraight','LongHairMiaWallace','LongHairFro','Hat','WinterHat1','WinterHat2','Hijab','Turban','Eyepatch'],
+  accessoriesType: ['Blank','Prescription01','Prescription02','Round','Sunglasses','Wayfarers','Kurt'],
+  hairColor: ['Black','Brown','BrownDark','Auburn','Blonde','BlondeGolden','Red','SilverGray','Platinum','PastelPink'],
+  facialHairType: ['Blank','BeardLight','BeardMedium','BeardMajestic','MoustacheFancy','MoustacheMagnum'],
+  facialHairColor: ['Brown','BrownDark','Auburn','Black','Blonde','BlondeGolden','Red','Platinum'],
+  clotheType: ['Hoodie','BlazerShirt','BlazerSweater','ShirtCrewNeck','ShirtScoopNeck','ShirtVNeck','CollarSweater','Overall','GraphicShirt'],
+  clotheColor: ['Red','Blue01','Blue02','Blue03','Black','White','Heather','Gray01','Gray02','PastelBlue','PastelGreen','PastelOrange','PastelYellow','Pink'],
+  graphicType: ['Bat','Cumbia','Deer','Diamond','Hola','Pizza','Resist','Selena','Bear','SkullOutline','Skull'],
+  eyeType: ['Default','Happy','Side','Squint','Surprised','Wink','Close','Dizzy','EyeRoll','Hearts','WinkWacky'],
+  eyebrowType: ['Default','DefaultNatural','FlatNatural','RaisedExcited','RaisedExcitedNatural','Angry','AngryNatural','SadConcerned','SadConcernedNatural','UnibrowNatural','UpDown','UpDownNatural'],
+  mouthType: ['Default','Smile','Serious','Twinkle','Tongue','Eating','Concerned','Disbelief','Sad','Grimace'],
+  skinColor: ['Light','Tanned','Yellow','Pale','Brown','DarkBrown','Black'],
+};
+
+export function getAvataaarsUrl(config: Partial<AvatarConfig>): string {
+  const params = new URLSearchParams({ avatarStyle: 'Circle', ...config } as Record<string, string>);
+  return `https://avataaars.io/?${params.toString()}`;
+}
+
+export function getDefaultAvatarConfig(name: string): AvatarConfig {
+  const hash = (name || '').split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) & 0xfffffff, 0);
+  const pick = <T>(arr: T[], offset: number) => arr[Math.abs(hash + offset * 7919) % arr.length];
+  return {
+    topType: pick(AVATAR_OPTIONS.topType, 0),
+    accessoriesType: pick(AVATAR_OPTIONS.accessoriesType, 1),
+    hairColor: pick(AVATAR_OPTIONS.hairColor, 2),
+    facialHairType: 'Blank',
+    facialHairColor: 'Brown',
+    clotheType: pick(AVATAR_OPTIONS.clotheType, 3),
+    clotheColor: pick(AVATAR_OPTIONS.clotheColor, 4),
+    graphicType: 'Bat',
+    eyeType: pick(AVATAR_OPTIONS.eyeType, 5),
+    eyebrowType: pick(AVATAR_OPTIONS.eyebrowType, 6),
+    mouthType: pick(AVATAR_OPTIONS.mouthType, 7),
+    skinColor: pick(AVATAR_OPTIONS.skinColor, 8),
+  };
+}
+
 export function playerAvatar(name: string): string {
   const hash = (name || '').split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) & 0xfffffff, 0);
   const bg = AVATAR_COLORS[hash % AVATAR_COLORS.length];

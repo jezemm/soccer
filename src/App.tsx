@@ -141,7 +141,7 @@ export default function App() {
   const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [targetPlayerProfile, setTargetPlayerProfile] = useState<string | null>(null);
   const [targetAdminRole, setTargetAdminRole] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<Record<string, { skills?: string, photoUrl?: string }>>({});
+  const [profiles, setProfiles] = useState<Record<string, { skills?: string, photoUrl?: string, avatarConfig?: any }>>({});
   const [feedbacks, setFeedbacks] = useState<PlayerFeedback[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -1410,12 +1410,13 @@ export default function App() {
     }
   };
 
-  const updateProfile = async (skills: string, photoUrl: string) => {
+  const updateProfile = async (skills: string, photoUrl: string, avatarConfig?: any) => {
     if (!userName) return;
     try {
       await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), {
         skills,
         photoUrl,
+        ...(avatarConfig ? { avatarConfig } : {}),
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (error) {
@@ -1649,9 +1650,9 @@ export default function App() {
               </div>
             </button>
             <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3">
-              <img 
-                src={playerAvatar(userName || '')} 
-                alt="Avatar" 
+              <img
+                src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || '')}
+                alt="Avatar"
                 className="w-8 h-8 rounded-full"
                 referrerPolicy="no-referrer"
               />
@@ -1728,10 +1729,10 @@ export default function App() {
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
-                      <img 
-                        src={playerAvatar(userName || '')} 
-                        alt="Avatar" 
-                        className="w-8 h-8 rounded-full border border-emjsc-red bg-white" 
+                      <img
+                        src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || '')}
+                        alt="Avatar"
+                        className="w-8 h-8 rounded-full border border-emjsc-red bg-white"
                         referrerPolicy="no-referrer"
                       />
                       <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{userName}</span>
@@ -2221,16 +2222,22 @@ export default function App() {
                       </div>
                     ))}
 
-                    {/* Players */}
+                    {/* Players — logged-in player first */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {squad.map((player) => {
+                      {[...squad].sort((a, b) => {
+                        if (a.name === userName) return -1;
+                        if (b.name === userName) return 1;
+                        return 0;
+                      }).map((player) => {
                         const isMe = player.name === userName;
                         const isEditing = isMe && editingSkills !== null;
+                        const playerProfileKey = player.name.replace(/\s+/g, '_');
+                        const playerPhotoUrl = profiles[playerProfileKey]?.photoUrl || playerAvatar(player.name);
                         return (
                           <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow group overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                             <div className="flex items-center gap-4">
                               <img
-                                src={playerAvatar(player.name)}
+                                src={playerPhotoUrl}
                                 alt={player.name}
                                 className="w-16 h-16 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform"
                               />
@@ -2259,7 +2266,7 @@ export default function App() {
                                       className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all"
                                     >Cancel</button>
                                     <button
-                                      onClick={async () => { await updateProfile(editingSkills, playerAvatar(userName || '')); setEditingSkills(null); }}
+                                      onClick={async () => { await updateProfile(editingSkills, profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || playerAvatar(userName || ''), profiles[(userName || '').replace(/\s+/g, '_')]?.avatarConfig); setEditingSkills(null); }}
                                       className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all"
                                     >Save</button>
                                   </div>
