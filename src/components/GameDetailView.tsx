@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car, Flag, User } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
-import { splitOpponent, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay, extractDestFromMapUrl } from '../lib/constants';
+import { splitOpponent, trimOpponentName, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay, extractDestFromMapUrl } from '../lib/constants';
 import type { NearbyCafe, CafeSortMode } from '../lib/constants';
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
@@ -201,7 +201,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
               />
             )}
             <div>
-              {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{team}</p>}</>; })()}
+              <h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {trimOpponentName(game.opponent)}</h3>
             </div>
           </div>
           <div className="space-y-2">

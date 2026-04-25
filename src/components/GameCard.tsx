@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Navigation, ArrowLeftRight, Car, RefreshCw, Users, Flag, User } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
-import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
+import { splitOpponent, trimOpponentName, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
 export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false, userCoords = null, onRequestLocation, compact = false }: any) {
   const date = new Date(game.date);
@@ -102,9 +102,9 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           </div>
 
           {/* Opponent */}
-          <div className="leading-tight">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className={`font-black text-emjsc-navy uppercase italic ${compact ? 'text-base' : 'text-xl'}`}>Vs {club || team}</p>{club && team && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
-          </div>
+          <p className={`font-black text-emjsc-navy uppercase italic leading-tight ${compact ? 'text-base' : 'text-xl'}`}>
+            Vs {trimOpponentName(game.opponent)}
+          </p>
 
           {/* Full venue address + navigate — next card only */}
           {!compact && rawLocation && (

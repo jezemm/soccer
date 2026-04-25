@@ -282,6 +282,13 @@ export function splitOpponent(name: string): { club: string; team: string } {
   return { club: name.slice(0, idx).trim(), team: name.slice(idx + 3).trim() };
 }
 
+export function trimOpponentName(opponent: string): string {
+  const { club, team } = splitOpponent(opponent);
+  const base = club || team;
+  const m = base.match(/^(.*?\b(?:FC|SC)\b)/i);
+  return m ? m[1].trim() : base.trim();
+}
+
 // ---------------------------------------------------------------------------
 // AVATAAARS — URL-based avatar builder (no npm package, just query params)
 // ---------------------------------------------------------------------------
