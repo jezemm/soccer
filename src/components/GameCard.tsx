@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ArrowLeftRight, Zap, Users } from 'lucide-react';
-import { splitOpponent } from '../lib/constants';
+import { splitOpponent, getGameMapUrl } from '../lib/constants';
 
 export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
   const date = new Date(game.date);
@@ -64,7 +64,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-lg font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{team}</p>}</>; })()}
           </div>
           <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
+            href={getGameMapUrl(game)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}

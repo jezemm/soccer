@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation } from 'lucide-react';
-import { splitOpponent, getCafesForLocation } from '../lib/constants';
+import { splitOpponent, getCafesForLocation, getGameMapUrl, getVenueName } from '../lib/constants';
 import type { NearbyCafe } from '../lib/constants';
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
@@ -121,7 +121,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             <p className="text-emjsc-navy text-xs font-black uppercase tracking-widest flex items-center gap-2">
               <MapPin className="w-4 h-4 text-emjsc-red" />
               <a
-                href={game.mapUrlOverride || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(game.location)}`}
+                href={getGameMapUrl(game)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline"
@@ -216,7 +216,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
 
                   {i === 0 && (
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
@@ -234,7 +234,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 We don't have curated cafe picks for this venue yet — but Google Maps has you covered.
               </p>
               <a
-                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(game.location)}`}
+                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
@@ -243,7 +243,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 Find Cafes Near {game.location.split(',')[0]}
               </a>
               <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}&travelmode=driving`}
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&travelmode=driving`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all"

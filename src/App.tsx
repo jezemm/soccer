@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
-import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime } from './lib/constants';
+import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl } from './lib/constants';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
@@ -1965,7 +1965,7 @@ export default function App() {
                                   <div className="space-y-1">
                                     {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
                                     <a
-                                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
+                                      href={getGameMapUrl(game)}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}
