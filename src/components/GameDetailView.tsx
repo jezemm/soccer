@@ -91,14 +91,16 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         lastFetchLocationRef.current = gameLocation;
       })
       .catch(() => setCafesStatus('error'));
-  }, [venueName, gameLocation]);
+  }, [gameLocation]);
 
-  useEffect(() => { fetchCafes(); }, [fetchCafes]);
-
-  const handleRefreshCafes = () => {
+  useEffect(() => {
+    // Bust cache if location changed mid-session (e.g. admin updated venue)
     const locationChanged = lastFetchLocationRef.current !== '' && gameLocation !== lastFetchLocationRef.current;
     fetchCafes(locationChanged);
-  };
+  }, [fetchCafes]);
+
+  // Manual refresh always busts the server cache
+  const handleRefreshCafes = () => fetchCafes(true);
 
   const displayCafes = sortCafes(cafes, cafeSort, 3);
 

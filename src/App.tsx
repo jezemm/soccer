@@ -1868,7 +1868,7 @@ export default function App() {
                         return (
                           <div className="space-y-4">
                             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-4">Coach Notes for You</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                               {myFeedback.goals && (
                                 <motion.div
                                   initial={{ opacity: 0, scale: 0.95 }}
@@ -2216,6 +2216,9 @@ export default function App() {
                             </a>
                           </div>
                         </div>
+                        <p className="text-[9px] text-slate-400 font-medium italic">
+                          Note: some calendar apps can take up to 24 hours to show new events after subscribing.
+                        </p>
                       </div>
                     </div>
                   </div>

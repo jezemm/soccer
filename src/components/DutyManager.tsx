@@ -15,11 +15,13 @@ export function DutyManager({
   const [newType, setNewType] = useState<'player' | 'parent'>('player');
   const [newApplicability, setNewApplicability] = useState<'home' | 'away' | 'both'>('both');
   const [newEmoji, setNewEmoji] = useState('');
+  const [newMaxAlloc, setNewMaxAlloc] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [editType, setEditType] = useState<'player' | 'parent'>('player');
   const [editApplicability, setEditApplicability] = useState<'home' | 'away' | 'both'>('both');
   const [editEmoji, setEditEmoji] = useState('');
+  const [editMaxAlloc, setEditMaxAlloc] = useState(1);
 
   const [localDuties, setLocalDuties] = useState<any[]>(duties);
   useEffect(() => { setLocalDuties(duties); }, [duties]);
@@ -32,10 +34,11 @@ export function DutyManager({
     setEditType(d.type);
     setEditApplicability(d.applicableTo || 'both');
     setEditEmoji(d.emoji || '');
+    setEditMaxAlloc(d.maxPerWeek ?? 1);
   };
 
   const saveEdit = (d: any) => {
-    const updated: any = { ...d, label: editLabel, type: editType, applicableTo: editApplicability };
+    const updated: any = { ...d, label: editLabel, type: editType, applicableTo: editApplicability, maxPerWeek: editMaxAlloc, maxPerType: editMaxAlloc };
     if (editEmoji) updated.emoji = editEmoji;
     else delete updated.emoji;
     setLocalDuties(prev => prev.map(i => i.id === updated.id ? updated : i));
@@ -84,8 +87,8 @@ export function DutyManager({
             const isEditing = editingId === d.id;
             return isEditing ? (
               <div key={d.id} className="p-4 bg-emjsc-navy/5 rounded-2xl border border-emjsc-navy/20 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="sm:col-span-1 space-y-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="col-span-2 sm:col-span-1 space-y-1">
                     <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Name</label>
                     <input
                       autoFocus
@@ -109,6 +112,17 @@ export function DutyManager({
                       <option value="home">Home Only</option>
                       <option value="away">Away Only</option>
                     </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Max Slots</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
+                      value={editMaxAlloc}
+                      onChange={(e) => setEditMaxAlloc(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -135,7 +149,7 @@ export function DutyManager({
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-emjsc-navy truncate">{d.label}</p>
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                    {d.type} · {d.applicableTo === 'both' ? 'All Games' : d.applicableTo === 'home' ? 'Home Only' : 'Away Only'}
+                    {d.type} · {d.applicableTo === 'both' ? 'All Games' : d.applicableTo === 'home' ? 'Home Only' : 'Away Only'} · {d.maxPerWeek ?? 1} slot{(d.maxPerWeek ?? 1) !== 1 ? 's' : ''}
                   </p>
                 </div>
                 <button onClick={() => startEdit(d)} className="p-2 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg transition-colors">
@@ -161,6 +175,17 @@ export function DutyManager({
               <option value="home">Home Only</option>
               <option value="away">Away Only</option>
             </select>
+            <div className="flex flex-col justify-end gap-1">
+              <label className="text-[8px] font-black uppercase text-slate-400">Max Slots</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className="w-20 p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
+                value={newMaxAlloc}
+                onChange={(e) => setNewMaxAlloc(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-lg shrink-0">
@@ -175,8 +200,8 @@ export function DutyManager({
           <button
             onClick={() => {
               if (!newLabel.trim()) return;
-              onAdd({ id: newLabel.toLowerCase().replace(/\s+/g, '_'), label: newLabel, emoji: newEmoji || undefined, type: newType, maxPerWeek: 1, maxPerType: 1, applicableTo: newApplicability });
-              setNewLabel(''); setNewEmoji('');
+              onAdd({ id: newLabel.toLowerCase().replace(/\s+/g, '_'), label: newLabel, emoji: newEmoji || undefined, type: newType, maxPerWeek: newMaxAlloc, maxPerType: newMaxAlloc, applicableTo: newApplicability });
+              setNewLabel(''); setNewEmoji(''); setNewMaxAlloc(1);
             }}
             className="w-full bg-emjsc-navy text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform text-[10px] font-black uppercase"
           >
