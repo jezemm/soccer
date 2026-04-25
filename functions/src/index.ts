@@ -1,7 +1,7 @@
 // Must be first — forces Date local methods to use Melbourne time
 process.env.TZ = "Australia/Melbourne";
 
-import { onRequest } from "firebase-functions/v2/https";
+import { onRequest, onCall } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -234,6 +234,65 @@ export const fixturesICS = onRequest(
     } catch (err) {
       console.error("fixturesICS error:", err);
       res.status(500).send("Error generating calendar");
+    }
+  }
+);
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export const nearbyPlaces = onCall(
+  { region: "australia-southeast1" },
+  async (request) => {
+    const venue = ((request.data?.venue as string) || "").trim();
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!venue || !apiKey) return { cafes: [] };
+
+    try {
+      // 1. Geocode venue → lat/lng
+      const geoUrl =
+        `https://maps.googleapis.com/maps/api/geocode/json` +
+        `?address=${encodeURIComponent(venue)}&key=${apiKey}`;
+      const geoData = await fetch(geoUrl).then((r) => r.json());
+      const venueLoc: { lat: number; lng: number } | undefined =
+        geoData.results?.[0]?.geometry?.location;
+      if (!venueLoc) return { cafes: [] };
+
+      // 2. Places Nearby Search — cafes within 2 km
+      const placesUrl =
+        `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
+        `?location=${venueLoc.lat},${venueLoc.lng}&radius=2000&type=cafe&key=${apiKey}`;
+      const placesData = await fetch(placesUrl).then((r) => r.json());
+
+      const cafes = ((placesData.results as any[]) || [])
+        .filter((p) => p.business_status === "OPERATIONAL" && p.rating)
+        .map((p) => {
+          const cafeLat: number = p.geometry?.location?.lat ?? venueLoc.lat;
+          const cafeLng: number = p.geometry?.location?.lng ?? venueLoc.lng;
+          const distanceKm =
+            Math.round(haversineKm(venueLoc.lat, venueLoc.lng, cafeLat, cafeLng) * 10) / 10;
+          return {
+            name: p.name as string,
+            address: p.vicinity as string,
+            rating: (p.rating as number) ?? null,
+            distanceKm,
+            mapsUrl: `https://www.google.com/maps/place/?q=place_id:${p.place_id}`,
+          };
+        });
+
+      return { cafes };
+    } catch (err) {
+      console.error("nearbyPlaces error:", err);
+      return { cafes: [] };
     }
   }
 );

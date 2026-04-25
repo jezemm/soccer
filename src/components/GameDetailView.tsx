@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation } from 'lucide-react';
-import { splitOpponent, getCafesForLocation, getGameMapUrl, getVenueName, formatVenueDisplay } from '../lib/constants';
-import type { NearbyCafe } from '../lib/constants';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../lib/firebase';
+import { splitOpponent, getCafesForLocation, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay } from '../lib/constants';
+import type { NearbyCafe, CafeSortMode } from '../lib/constants';
+
+const getNearbyPlaces = httpsCallable<{ venue: string }, { cafes: NearbyCafe[] }>(functions, 'nearbyPlaces');
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
   return (
@@ -62,10 +66,23 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const isUnavailable = availabilities.some((a: any) => a.playerName === user.displayName && a.dateKey === dateKey && a.isUnavailable);
   const matchAvailabilities = availabilities.filter((a: any) => a.dateKey === dateKey && a.isUnavailable);
 
-  const nearbyCafes = getCafesForLocation(game.location || '');
-  const bestCafe: NearbyCafe | null = nearbyCafes.length > 0
-    ? [...nearbyCafes].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0]
-    : null;
+  const [cafeSort, setCafeSort] = useState<CafeSortMode>('weighted');
+  const [apiCafes, setApiCafes] = useState<NearbyCafe[] | null>(null);
+  const [cafesLoading, setCafesLoading] = useState(false);
+
+  const venueName = getVenueName(game.location || '');
+  useEffect(() => {
+    if (!venueName) return;
+    setCafesLoading(true);
+    setApiCafes(null);
+    getNearbyPlaces({ venue: venueName + ' Melbourne VIC' })
+      .then((result) => setApiCafes(result.data.cafes?.length ? result.data.cafes : null))
+      .catch(() => setApiCafes(null))
+      .finally(() => setCafesLoading(false));
+  }, [venueName]);
+
+  const allCafes = apiCafes ?? getCafesForLocation(game.location || '');
+  const nearbyCafes = sortCafes(allCafes, cafeSort, 3);
 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -190,51 +207,65 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
 
       {game.location && (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-            <Coffee className="w-4 h-4 text-amber-600" />
-            Nearby Coffee
-          </h4>
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 shrink-0">
+              <Coffee className={`w-4 h-4 text-amber-600 ${cafesLoading ? 'animate-pulse' : ''}`} />
+              Nearby Coffee
+              {cafesLoading && <span className="text-[8px] text-slate-300 normal-case font-bold tracking-normal">Loading…</span>}
+            </h4>
+            {allCafes.length > 0 && (
+              <div className="flex p-0.5 bg-slate-100 rounded-xl gap-0.5">
+                {([['nearest', 'Nearest'], ['rated', 'Top Rated'], ['weighted', 'Best Match']] as [CafeSortMode, string][]).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setCafeSort(mode)}
+                    className={`px-2.5 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all ${cafeSort === mode ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-400'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {nearbyCafes.length > 0 ? (
             <div className="space-y-3">
               {nearbyCafes.map((cafe, i) => (
-                <div key={cafe.name} className={`rounded-2xl border p-4 space-y-2 ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-black text-slate-800">{cafe.name}</p>
-                        {i === 0 && <span className="text-[7px] font-black uppercase tracking-widest bg-amber-500 text-white px-1.5 py-0.5 rounded shrink-0">Top Pick</span>}
-                      </div>
+                <div key={cafe.name} className={`rounded-2xl border p-4 space-y-3 ${i === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-black text-slate-800">{cafe.name}</p>
+                      {i === 0 && <span className="text-[7px] font-black uppercase tracking-widest bg-amber-500 text-white px-1.5 py-0.5 rounded shrink-0">Top Pick</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5">
                       {cafe.rating !== null && (
-                        <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex items-center gap-1">
                           <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                           <span className="text-[10px] font-black text-amber-700">{cafe.rating.toFixed(1)}</span>
                         </div>
                       )}
-                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{cafe.description}</p>
-                      <a
-                        href={cafe.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 mt-1.5 w-fit group/cafe"
-                      >
-                        <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight group-hover/cafe:text-emjsc-red transition-colors">{cafe.address}</span>
-                      </a>
+                      <span className="text-[10px] font-bold text-slate-400">{cafe.distanceKm < 1 ? `${Math.round(cafe.distanceKm * 1000)} m` : `${cafe.distanceKm.toFixed(1)} km`} away</span>
                     </div>
-                  </div>
-
-                  {i === 0 && (
+                    {cafe.description && <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{cafe.description}</p>}
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                      href={cafe.mapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
+                      className="flex items-center gap-1 mt-1.5 w-fit group/cafe"
                     >
-                      <Navigation className="w-3.5 h-3.5" />
-                      Add a Stop on the Way
+                      <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight group-hover/cafe:text-emjsc-red transition-colors">{cafe.address}</span>
                     </a>
-                  )}
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center justify-center gap-2 w-full text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all ${i === 0 ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-900/20' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'} active:scale-[0.98]`}
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    Stop Here on the Way
+                  </a>
                 </div>
               ))}
             </div>

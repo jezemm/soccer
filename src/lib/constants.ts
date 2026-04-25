@@ -4,9 +4,25 @@
 export interface NearbyCafe {
   name: string;
   address: string;
-  rating: number | null;   // Google Maps rating (null = unconfirmed)
-  description: string;
+  rating: number | null;
+  distanceKm: number;
+  description?: string;
   mapsUrl: string;
+}
+
+export type CafeSortMode = 'nearest' | 'rated' | 'weighted';
+
+export function sortCafes(cafes: NearbyCafe[], mode: CafeSortMode, limit = 3): NearbyCafe[] {
+  const sorted = [...cafes].sort((a, b) => {
+    if (mode === 'nearest') return a.distanceKm - b.distanceKm;
+    if (mode === 'rated') return (b.rating ?? 0) - (a.rating ?? 0);
+    // weighted: 50% rating (0-5 → 0-1) + 50% proximity (inverse, capped at 5km)
+    const maxDist = Math.max(...cafes.map(c => c.distanceKm), 5);
+    const scoreA = 0.5 * ((a.rating ?? 3) / 5) + 0.5 * (1 - Math.min(a.distanceKm, maxDist) / maxDist);
+    const scoreB = 0.5 * ((b.rating ?? 3) / 5) + 0.5 * (1 - Math.min(b.distanceKm, maxDist) / maxDist);
+    return scoreB - scoreA;
+  });
+  return sorted.slice(0, limit);
 }
 
 export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
@@ -15,6 +31,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "NAPA Glen Iris",
       address: "451 Burke Rd, Glen Iris VIC 3146",
       rating: 4.7,
+      distanceKm: 1.5,
       description: "Modern Australasian cafe on Burke Rd — exceptional coffee, inventive brunch dishes, warm atmosphere",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=NAPA+Glen+Iris+451+Burke+Rd+Glen+Iris+VIC",
     },
@@ -22,6 +39,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Beans Republique Glen Iris",
       address: "1461 Malvern Rd, Glen Iris VIC 3146",
       rating: 4.5,
+      distanceKm: 1.1,
       description: "Popular all-day cafe on Malvern Rd with great coffee and a big brunch menu",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Beans+Republique+1461+Malvern+Rd+Glen+Iris+VIC",
     },
@@ -31,6 +49,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Mr Burton",
       address: "199 High St, Ashburton VIC 3147",
       rating: 4.4,
+      distanceKm: 0.4,
       description: "European-inspired bistro cafe right on High St — lovely all-day brunch and Melbourne-roasted coffee",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Mr+Burton+199+High+St+Ashburton+VIC",
     },
@@ -40,6 +59,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "The Penny Drop",
       address: "913 Whitehorse Rd, Box Hill VIC 3128",
       rating: 4.0,
+      distanceKm: 0.4,
       description: "Buzzy all-day cafe in the ATO building on Whitehorse Rd — strong coffee, great brunch, easy parking",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=The+Penny+Drop+913+Whitehorse+Rd+Box+Hill+VIC",
     },
@@ -47,6 +67,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Batch Coffee Roasters",
       address: "2A Viking Ct, Cheltenham VIC 3192",
       rating: 4.9,
+      distanceKm: 22.0,
       description: "Specialty roastery and cafe — one of Melbourne's highest-rated coffee spots, worth the slight detour",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Batch+Coffee+Roasters+2A+Viking+Ct+Cheltenham+VIC",
     },
@@ -56,6 +77,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Mr Brightside",
       address: "189A Booran Rd, Caulfield South VIC 3162",
       rating: 4.3,
+      distanceKm: 1.2,
       description: "Relaxed neighbourhood cafe directly opposite a park — beloved by locals for weekend brunch after sport",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Mr+Brightside+189A+Booran+Rd+Caulfield+South+VIC",
     },
@@ -63,6 +85,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Parkside Pantry",
       address: "98 Hawthorn Rd, Caulfield North VIC 3161",
       rating: null,
+      distanceKm: 0.8,
       description: "Deli-cafe at the corner of Hawthorn and Balaclava Rds, right next to Caulfield Park — artisan produce, great coffee",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Parkside+Pantry+98+Hawthorn+Rd+Caulfield+North+VIC",
     },
@@ -72,6 +95,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "The Tamper Trap",
       address: "181 Bay St, Brighton VIC 3186",
       rating: 4.5,
+      distanceKm: 0.6,
       description: "Regarded as the best specialty coffee on Bay St — creative brunch menu and first-class service",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=The+Tamper+Trap+181+Bay+St+Brighton+VIC",
     },
@@ -79,6 +103,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "North Point Cafe",
       address: "2B North Rd, Brighton VIC 3186",
       rating: 4.5,
+      distanceKm: 1.2,
       description: "Beachside cafe almost on the sand at the end of North Rd — great all-day breakfast with ocean views",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=North+Point+Cafe+2B+North+Rd+Brighton+VIC",
     },
@@ -88,6 +113,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Main Street Cafe",
       address: "503-505 Main St, Mordialloc VIC 3195",
       rating: 4.2,
+      distanceKm: 0.3,
       description: "Mordialloc institution on Main St — epic breakfasts, long lunches, and the heart of the local cafe scene since 2009",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Main+Street+Cafe+503+Main+St+Mordialloc+VIC",
     },
@@ -95,6 +121,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Naked Racer Cafe",
       address: "1 Grange Rd, Cheltenham VIC 3192",
       rating: 4.6,
+      distanceKm: 5.2,
       description: "Moto-themed specialty cafe on the way in from Cheltenham — excellent coffee, cool fit-out, popular with cyclists",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Naked+Racer+Cafe+1+Grange+Rd+Cheltenham+VIC",
     },
@@ -104,6 +131,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Le Roi Cafe",
       address: "1/44 Como Parade West, Mentone VIC 3194",
       rating: 4.4,
+      distanceKm: 0.4,
       description: "Right opposite Mentone Station on Como Parade — all-day breakfast, smooth espresso, and a warm local vibe",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Le+Roi+Cafe+44+Como+Parade+West+Mentone+VIC",
     },
@@ -113,6 +141,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Frank's Cafe",
       address: "97 Cavanagh St, Cheltenham VIC 3192",
       rating: 4.6,
+      distanceKm: 0.8,
       description: "Highly rated neighbourhood cafe in Cheltenham — house-made pastries, great coffee, and a relaxed all-day menu",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Franks+Cafe+97+Cavanagh+St+Cheltenham+VIC",
     },
@@ -120,6 +149,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Batch Coffee Roasters",
       address: "2A Viking Ct, Cheltenham VIC 3192",
       rating: 4.9,
+      distanceKm: 0.5,
       description: "Award-winning specialty roastery and cafe — one of Melbourne's best-rated coffee spots, just off Nepean Hwy",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Batch+Coffee+Roasters+2A+Viking+Ct+Cheltenham+VIC",
     },
@@ -129,6 +159,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Brown Cow",
       address: "382 Hampton St, Hampton VIC 3188",
       rating: 4.5,
+      distanceKm: 0.4,
       description: "All-day dining favourite on the Hampton St strip — quality Modern Australian food and great coffee",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Brown+Cow+382+Hampton+St+Hampton+VIC",
     },
@@ -136,6 +167,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "The Hamptons Bakery",
       address: "427 Hampton St, Hampton VIC 3188",
       rating: 4.1,
+      distanceKm: 0.6,
       description: "Spacious artisan bakery-cafe on Hampton St — famous for house-baked bread, pastries, and a relaxed brunch atmosphere",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=The+Hamptons+Bakery+427+Hampton+St+Hampton+VIC",
     },
@@ -145,6 +177,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Point Ormond Cafe",
       address: "29A Ormond Esplanade, Elwood VIC 3184",
       rating: 4.4,
+      distanceKm: 0.5,
       description: "Beachside cafe right on Ormond Esplanade — sit outside, watch the bay, simple and delicious food at easy prices",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Point+Ormond+Cafe+29A+Ormond+Esplanade+Elwood+VIC",
     },
@@ -152,6 +185,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Jerry's Milk Bar",
       address: "345 Barkly St, Elwood VIC 3184",
       rating: 4.0,
+      distanceKm: 0.8,
       description: "Elwood institution with 40+ years of history — retro milk-bar vibe, specialty coffee, and an all-day menu",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Jerrys+Milk+Bar+345+Barkly+St+Elwood+VIC",
     },
@@ -161,6 +195,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Hello Sparrow",
       address: "126A Chapel St, St Kilda VIC 3182",
       rating: 4.7,
+      distanceKm: 0.7,
       description: "Warm, neighbourhood cafe near Chapel St — flaky almond croissants, perfectly poured coffee, generous big breakfasts",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Hello+Sparrow+126A+Chapel+St+St+Kilda+VIC",
     },
@@ -168,6 +203,7 @@ export const NEARBY_CAFES: Record<string, NearbyCafe[]> = {
       name: "Sorsi e Morsi",
       address: "31 Blessington St, St Kilda VIC 3182",
       rating: 4.5,
+      distanceKm: 0.5,
       description: "Italian-inspired brunch cafe next to St Kilda Peanut Farm Reserve — great espresso and relaxed Italian fare since 2013",
       mapsUrl: "https://www.google.com/maps/search/?api=1&query=Sorsi+e+Morsi+31+Blessington+St+St+Kilda+VIC",
     },
