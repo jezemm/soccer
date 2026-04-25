@@ -161,10 +161,16 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-emjsc-navy">{item.question}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{item.answer}</p>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {(item.visibleTo || ALL_ROLES).map((r: string) => (
-                      <span key={r} className="text-[7px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">{ROLE_LABELS[r] ?? r}</span>
-                    ))}
+                  <div className="mt-2">
+                    <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-1">Visible to</p>
+                    <VisibilityCheckboxes
+                      value={item.visibleTo || ALL_ROLES}
+                      onChange={(next) => {
+                        const updated = { ...item, visibleTo: next };
+                        setLocalItems(prev => prev.map(i => i.id === item.id ? updated : i));
+                        onUpdate(updated);
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
