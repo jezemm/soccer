@@ -119,6 +119,15 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 lines.push("👨‍💼 COACH NOTES");
                 lines.push(g.matchWrap);
             }
+            // Links section
+            const gameUrl = `https://soccerhub.jeremymarks.com.au/#/game/${doc.id}`;
+            lines.push("");
+            lines.push("🔗 LINKS");
+            lines.push(`Match Details: ${gameUrl}`);
+            lines.push("Team Hub: https://soccerhub.jeremymarks.com.au");
+            lines.push("EMJSC Website: https://emjs.club");
+            lines.push("Dribl Team: https://app.dribl.com/app/open?team=NjkzMzkx");
+            lines.push("FV Fixtures: https://fv.dribl.com/fixtures/?date_range=default&season=nPmrj2rmow&competition=Rxm8RpZLKr&club=3pmvQzZrdv&timezone=Australia%2FMelbourne");
             const desc = escIcs(lines.join("\n"));
             events.push([
                 "BEGIN:VEVENT",
@@ -128,6 +137,7 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 `DTEND;TZID=${TZID}:${toLocal(end)}`,
                 `SUMMARY:${escIcs(`⚽ EMJSC U8 vs ${opponentShort}`)}`,
                 `LOCATION:${escIcs(locationFull)}`,
+                `URL:${gameUrl}`,
                 `DESCRIPTION:${desc}`,
                 // Alert fires 60 min before kick-off = 30 min before arrival
                 "BEGIN:VALARM",
