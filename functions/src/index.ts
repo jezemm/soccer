@@ -43,6 +43,12 @@ function splitOpponent(opponent: string) {
   return { club: opponent.slice(0, idx), team: opponent.slice(idx + 3) };
 }
 
+function getVenueName(location: string): string {
+  const m = location.match(/^(.*?\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
+  if (m) return m[1].trim();
+  return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, "").trim() || location;
+}
+
 const DEFAULT_DUTIES = [
   { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
   { id: "goalie_2", label: "Goalie (2nd Half)", emoji: "", applicableTo: "both" },
@@ -104,14 +110,15 @@ export const fixturesICS = onRequest(
 
         // Location string — venue name + city for Apple/Google Maps geocoding
         const locationName = g.location || "";
-        const locationFull = locationName
-          ? `${locationName}, Melbourne VIC, Australia`
+        const venueName = locationName ? getVenueName(locationName) : "";
+        const locationFull = venueName
+          ? `${venueName}, Melbourne VIC, Australia`
           : "";
 
         // Google Maps search link for the description
         const mapsUrl = g.mapUrlOverride ||
-          (locationName
-            ? `https://maps.apple.com/?q=${encodeURIComponent(locationName + " Melbourne VIC")}`
+          (venueName
+            ? `https://maps.apple.com/?q=${encodeURIComponent(venueName + " Melbourne VIC")}`
             : null);
 
         // Build description with real newlines — escIcs converts them to \n
@@ -172,7 +179,7 @@ export const fixturesICS = onRequest(
             "BEGIN:VALARM",
             "TRIGGER:-PT60M",
             "ACTION:DISPLAY",
-            `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${locationName || "the venue"}`,
+            `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${venueName || locationName || "the venue"}`,
             "END:VALARM",
             "END:VEVENT",
           ].join("\r\n")
