@@ -349,9 +349,7 @@ export type DriblCache = { fixtures: any[]; emjscTeams: string[]; selectedTeam: 
 type ScrapePhase =
   | { tag: 'idle' }
   | { tag: 'scraping' }
-  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string; cachedAt?: string }
-  | { tag: 'syncing' }
-  | { tag: 'done'; count: number }
+  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string; cachedAt?: string; saving?: boolean; savedCount?: number }
   | { tag: 'error'; message: string };
 
 function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDriblCache }: {
@@ -404,23 +402,16 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   };
 
   const confirmSync = async () => {
-    if (phase.tag !== 'preview') return;
-    const { allFixtures, selectedTeam } = phase;
-    setPhase({ tag: 'syncing' });
+    if (phase.tag !== 'preview' || phase.saving) return;
+    const { allFixtures, emjscTeams, selectedTeam, cachedAt } = phase;
+    setPhase({ tag: 'preview', allFixtures, emjscTeams, selectedTeam, cachedAt, saving: true });
     try {
       await onConfirmSync(allFixtures, selectedTeam);
       const count = allFixtures.filter(f =>
         (f.home_team_name || '').includes(selectedTeam) ||
         (f.away_team_name || '').includes(selectedTeam)
       ).length;
-      setPhase({ tag: 'done', count });
-      setTimeout(() => {
-        if (driblCache) {
-          setPhase({ tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt });
-        } else {
-          setPhase({ tag: 'idle' });
-        }
-      }, 3000);
+      setPhase({ tag: 'preview', allFixtures, emjscTeams, selectedTeam, cachedAt, saving: false, savedCount: count });
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Sync failed' });
     }
@@ -469,26 +460,8 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
     </div>
   );
 
-  // ── Done ──
-  if (phase.tag === 'done') return (
-    <div className="w-full bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
-      <Check className="w-5 h-5 text-green-600 shrink-0" />
-      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-green-700">
-        {phase.count} fixture{phase.count !== 1 ? 's' : ''} saved to database
-      </p>
-    </div>
-  );
-
-  // ── Syncing ──
-  if (phase.tag === 'syncing') return (
-    <div className="w-full bg-emjsc-navy/10 border border-emjsc-navy/20 rounded-2xl p-5 flex items-center gap-3">
-      <RefreshCw className="w-4 h-4 text-emjsc-navy animate-spin shrink-0" />
-      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Saving to database…</p>
-    </div>
-  );
-
   // ── Preview ──
-  const { allFixtures, emjscTeams, selectedTeam, cachedAt } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
+  const { allFixtures, emjscTeams, selectedTeam, cachedAt, saving, savedCount } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
   const teamFixtures = allFixtures
     .filter(f =>
       (f.home_team_name || '').includes(selectedTeam) ||
@@ -589,21 +562,32 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         </div>
       )}
 
+      {/* Success banner — shown inline, doesn't replace the view */}
+      {savedCount !== undefined && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl">
+          <Check className="w-4 h-4 text-green-600 shrink-0" />
+          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-green-700">
+            {savedCount} fixture{savedCount !== 1 ? 's' : ''} saved to database
+          </p>
+        </div>
+      )}
+
       {/* Action row */}
       <div className="flex gap-2">
         <button
           onClick={() => setPhase({ tag: 'idle' })}
-          className="flex-1 bg-slate-100 text-slate-500 text-[10px] font-black uppercase py-3.5 rounded-2xl border border-slate-200 active:scale-[0.98] transition-all"
+          disabled={saving}
+          className="flex-1 bg-slate-100 text-slate-500 text-[10px] font-black uppercase py-3.5 rounded-2xl border border-slate-200 active:scale-[0.98] transition-all disabled:opacity-40"
         >
           Cancel
         </button>
         <button
           onClick={confirmSync}
-          disabled={teamFixtures.length === 0}
+          disabled={teamFixtures.length === 0 || saving}
           className="flex-[2] bg-emjsc-navy text-white text-[10px] font-black uppercase py-3.5 rounded-2xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
         >
-          <CalendarDays className="w-4 h-4" />
-          Save {teamFixtures.length} Fixture{teamFixtures.length !== 1 ? 's' : ''} to Database
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+          {saving ? 'Saving…' : `Save ${teamFixtures.length} Fixture${teamFixtures.length !== 1 ? 's' : ''} to Database`}
         </button>
       </div>
     </div>
