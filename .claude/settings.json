@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"http://localhost:3000/api/sync-fixtures?season=nPmrj2rmow&club=3pmvQzZrdv&tenant=w8zdBWPmBX\")",
+      "Bash(curl -s -v 'https://mc-api.dribl.com/api/fixtures?date_range=default&season=nPmrj2rmow&club=3pmvQzZrdv&tenant=w8zdBWPmBX&timezone=Australia/Sydney' -H 'Accept: application/json' -H 'User-Agent: Dribl/1.0 \\(iPhone; iOS 17.0; Scale/3.00\\)' -H 'X-Tenant: w8zdBWPmBX')"
+    ]
+  }
+}

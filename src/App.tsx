@@ -43,7 +43,7 @@ import {
   Send,
   Lightbulb
 } from 'lucide-react';
-import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings } from './lib/firebase';
+import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings, TrainingSession } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
 import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay } from './lib/constants';
 import emailjs from '@emailjs/browser';
@@ -88,25 +88,6 @@ function ChangePasswordForm({ playerName, onSave }: { playerName: string; onSave
     </div>
   );
 }
-
-let mapsLoader: Promise<void> | null = null;
-function loadGoogleMaps(apiKey: string): Promise<void> {
-  if (mapsLoader) return mapsLoader;
-  if ((window as any).google?.maps?.DistanceMatrixService) {
-    mapsLoader = Promise.resolve();
-    return mapsLoader;
-  }
-  mapsLoader = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
-    document.head.appendChild(script);
-  });
-  return mapsLoader;
-}
-
 
 export default function App() {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
@@ -153,8 +134,10 @@ export default function App() {
   const [calendarUpdatedAt, setCalendarUpdatedAt] = useState<Date | null>(null);
   const [driblCache, setDriblCache] = useState<import('./components/AdminView').DriblCache | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
+  const [trainingSchedule, setTrainingSchedule] = useState<TrainingSession[]>([]);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
+  const [teamLogoUrl, setTeamLogoUrl] = useState('');
   const [coachChild, setCoachChild] = useState<string | null>(null);
   const [coachExemptDuties, setCoachExemptDuties] = useState<string[]>([]);
   const [messagingEnabled, setMessagingEnabled] = useState(false);
@@ -219,8 +202,10 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setTrainingCancelled(data.trainingCancelled);
+        setTrainingSchedule(data.trainingSchedule || []);
         setTrainingLocation(data.trainingLocation || 'Gardiner Park');
         setHomeGround(data.homeGround || 'Central Park, Malvern VIC');
+        setTeamLogoUrl(data.teamLogoUrl || '');
         setCoachChild(data.coachChild || null);
         setCoachExemptDuties(data.coachExemptDuties || []);
         setMessagingEnabled(data.messagingEnabled !== false);
@@ -1097,8 +1082,14 @@ export default function App() {
       await updateDoc(doc(db, 'games', gameId), updates);
 
       const game = games.find(g => g.id === gameId);
-      if (game && (updates.location || updates.date) && !game.isHome) {
-        await syncTravelTime(gameId, updates.location || game.location, updates.date || game.date);
+      if (game) {
+        const isAway = updates.isHome !== undefined ? !updates.isHome : !game.isHome;
+        const locationOrDateChanged = updates.location !== undefined || updates.date !== undefined || updates.isHome !== undefined;
+        if (isAway && locationOrDateChanged) {
+          const location = updates.location ?? game.location;
+          const date = updates.date ?? game.date;
+          syncTravelTime(gameId, location, date); // fire-and-forget
+        }
       }
       await bumpCalendar();
     } catch (error) {
@@ -1160,6 +1151,15 @@ export default function App() {
     }
   };
 
+  const updateTrainingSchedule = async (schedule: TrainingSession[]) => {
+    if (!isAdmin) return;
+    try {
+      await setDoc(doc(db, 'settings', 'training'), { trainingSchedule: schedule }, { merge: true });
+    } catch (error) {
+      console.error("Update training schedule error:", error);
+    }
+  };
+
   const bumpCalendar = async () => {
     try {
       await setDoc(doc(db, 'settings', 'calendar'), {
@@ -1185,36 +1185,50 @@ export default function App() {
     }
   };
 
+  const updateTeamLogoUrl = async (url: string) => {
+    if (!isAdmin) return;
+    try {
+      await setDoc(doc(db, 'settings', 'training'), { teamLogoUrl: url }, { merge: true });
+    } catch (error) {
+      console.error("Update team logo URL error:", error);
+    }
+  };
+
+  // Silently backfill travel times for upcoming away games missing the value
+  useEffect(() => {
+    if (!homeGround || !gamesLoaded) return;
+    const now = new Date();
+    const missing = games.filter(
+      g => !g.isHome && !g.travelTimeMinutes && g.location && new Date(g.date) > now
+    );
+    if (missing.length === 0) return;
+    missing.forEach((g, i) => {
+      setTimeout(() => syncTravelTime(g.id, g.location, g.date), i * 600);
+    });
+  }, [homeGround, gamesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const syncTravelTime = async (gameId: string, location: string, kickOffDateStr: string) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!homeGround || !location || !apiKey) return null;
+    if (!homeGround || !location) return null;
 
     const cleanLocation = location
       .split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0]
       .trim();
 
+    // Departure = arrival time = 30 min before kick-off
     const departureDate = new Date(new Date(kickOffDateStr).getTime() - 30 * 60000);
+    const departureSecs = Math.floor(departureDate.getTime() / 1000);
 
     try {
-      await loadGoogleMaps(apiKey);
-      const service = new (window as any).google.maps.DistanceMatrixService();
-      const result = await new Promise<any>((resolve, reject) => {
-        service.getDistanceMatrix({
-          origins: [homeGround],
-          destinations: [cleanLocation],
-          travelMode: 'DRIVING',
-          drivingOptions: { departureTime: departureDate, trafficModel: 'best_guess' },
-        }, (response: any, status: string) => {
-          if (status === 'OK') resolve(response);
-          else reject(new Error(status));
-        });
-      });
-
-      const element = result.rows[0].elements[0];
-      if (element.status === 'OK') {
-        const travelTimeMinutes = Math.ceil(element.duration_in_traffic?.value ?? element.duration.value) / 60;
-        await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes });
-        return travelTimeMinutes;
+      const resp = await fetch(
+        `${FUNCTIONS_BASE}/travelTime` +
+        `?origin=${encodeURIComponent(homeGround)}` +
+        `&destination=${encodeURIComponent(cleanLocation)}` +
+        `&departureTime=${departureSecs}`
+      );
+      const data = await resp.json();
+      if (data.minutes) {
+        await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes: data.minutes });
+        return data.minutes as number;
       }
     } catch (err) {
       console.error("Auto sync travel error:", err);
@@ -1353,26 +1367,6 @@ export default function App() {
     }
   };
 
-  const refreshTravelTimes = async () => {
-    if (!isAdmin || !homeGround) return;
-    setAdminActionStatus('Syncing unique park travel times...');
-    
-    try {
-      // Create a queue of unique location+time combos to sync
-      for (const game of games) {
-        if (!game.isHome) {
-          // Always refresh if we don't have it, or if it was the default
-          await syncTravelTime(game.id, game.location, game.date);
-        }
-      }
-      setAdminActionStatus('All travel times uniquely updated!');
-      setTimeout(() => setAdminActionStatus(null), 3000);
-    } catch (err) {
-      console.error("Refresh travel times error:", err);
-      setAdminActionStatus('Failed to update travel times');
-    }
-  };
-
   const updateCoachChild = async (name: string) => {
     if (!isAdmin) return;
     try {
@@ -1436,7 +1430,7 @@ export default function App() {
 
         <div className="flex flex-col items-center gap-6 mt-12 text-center">
           <img
-            src={CLUB_LOGO}
+            src={teamLogoUrl || CLUB_LOGO}
             alt="EMJSC Logo"
             className="w-32 drop-shadow-2xl"
             referrerPolicy="no-referrer"
@@ -1576,25 +1570,29 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <AnimatePresence>
-        {trainingCancelled && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-red-600 text-white border-b-4 border-red-800 sticky top-0 z-50 overflow-hidden"
-          >
-            <div className="py-4 px-6 flex items-center justify-center gap-3 text-center">
-              <AlertCircle className="w-5 h-5 shrink-0 animate-bounce" />
-              <div className="flex flex-col md:flex-row md:items-center md:gap-3">
-                <span className="text-sm font-black uppercase tracking-widest leading-none">Training is Cancelled</span>
-                <span className="text-[10px] bg-white/20 px-2 py-1 rounded font-bold uppercase hidden md:inline-block">
-                  {getNextTrainingDate()}
-                </span>
+        {(() => {
+          const cancelledSessions = trainingSchedule.filter(s => s.cancelled);
+          const showBanner = cancelledSessions.length > 0 || (trainingSchedule.length === 0 && trainingCancelled);
+          if (!showBanner) return null;
+          const label = cancelledSessions.length > 0
+            ? cancelledSessions.map(s => `${s.day} ${s.time}`).join(' & ') + ' Training Cancelled'
+            : 'Training is Cancelled';
+          return (
+            <motion.div
+              key="training-banner"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-red-600 text-white border-b-4 border-red-800 sticky top-0 z-50 overflow-hidden"
+            >
+              <div className="py-4 px-6 flex items-center justify-center gap-3 text-center">
+                <AlertCircle className="w-5 h-5 shrink-0 animate-bounce" />
+                <span className="text-sm font-black uppercase tracking-widest leading-none">{label}</span>
+                <AlertCircle className="w-5 h-5 shrink-0 hidden sm:block animate-bounce" />
               </div>
-              <AlertCircle className="w-5 h-5 shrink-0 hidden sm:block animate-bounce" />
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       <div className="mobile-container relative bg-slate-50 md:flex md:gap-8 md:items-start">
@@ -1602,7 +1600,7 @@ export default function App() {
         <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-white border-r border-slate-200 p-6 space-y-8 shadow-sm">
           <button onClick={() => navigate('/schedule')} className="flex items-center gap-3 mb-4 group active:scale-95 transition-transform text-left">
             <img
-              src={CLUB_LOGO}
+              src={teamLogoUrl || CLUB_LOGO}
               alt="Logo"
               className="w-10 h-10 object-contain group-hover:scale-105 transition-transform"
               referrerPolicy="no-referrer"
@@ -1662,7 +1660,7 @@ export default function App() {
             <div className="flex items-center justify-between">
               <button onClick={() => navigate('/schedule')} className="flex items-center gap-3 active:scale-95 transition-transform">
                 <img
-                  src={CLUB_LOGO}
+                  src={teamLogoUrl || CLUB_LOGO}
                   alt="Logo"
                   className="w-8 h-8 object-contain"
                   referrerPolicy="no-referrer"
@@ -2228,26 +2226,46 @@ export default function App() {
                     <div className="lg:col-span-4 space-y-6">
                       <section className="space-y-4">
                         <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Weekly Training</h2>
-                        <div className={`${trainingCancelled ? 'bg-slate-200 grayscale' : 'bg-emjsc-navy'} p-6 rounded-3xl shadow-xl border-l-4 ${trainingCancelled ? 'border-slate-400' : 'border-emjsc-red'} text-white relative overflow-hidden group transition-all duration-500`}>
-                          <div className="relative z-10 space-y-2">
-                            <div className="flex items-center gap-2 text-wrap">
-                              <p className={`text-[10px] font-bold ${trainingCancelled ? 'text-slate-600 bg-slate-100' : 'text-emjsc-red bg-white'} px-2 py-1 rounded inline-block uppercase tracking-widest`}>
-                                {trainingLocation}
+                        {trainingSchedule.length > 0 ? trainingSchedule.map(session => (
+                          <div key={session.id} className={`${session.cancelled ? 'bg-slate-200 grayscale' : 'bg-emjsc-navy'} p-6 rounded-3xl shadow-xl border-l-4 ${session.cancelled ? 'border-slate-400' : 'border-emjsc-red'} text-white relative overflow-hidden group transition-all duration-500`}>
+                            <div className="relative z-10 space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className={`text-[10px] font-bold ${session.cancelled ? 'text-slate-600 bg-slate-100' : 'text-emjsc-red bg-white'} px-2 py-1 rounded inline-block uppercase tracking-widest`}>
+                                  {session.location}
+                                </p>
+                                {session.cancelled && (
+                                  <span className="text-[10px] bg-red-600 text-white px-2 py-1 rounded font-black uppercase animate-pulse">Cancelled</span>
+                                )}
+                              </div>
+                              <h3 className="text-3xl font-black uppercase leading-none">{session.day} {session.time}</h3>
+                              <p className={`text-xs ${session.cancelled ? 'text-slate-500' : 'text-blue-100'} font-medium opacity-80 italic`}>
+                                {session.cancelled ? 'Session cancelled this week' : 'Parent led training session'}
                               </p>
-                              <span className={`text-[10px] font-bold ${trainingCancelled ? 'text-slate-500' : 'text-blue-100'} uppercase tracking-tight`}>
-                                {getNextTrainingDate()}
-                              </span>
-                              {trainingCancelled && (
-                                <span className="text-[10px] bg-red-600 text-white px-2 py-1 rounded font-black uppercase animate-pulse">Cancelled</span>
-                              )}
                             </div>
-                            <h3 className="text-3xl font-black uppercase leading-none">Wednesday 5 PM</h3>
-                            <p className={`text-xs ${trainingCancelled ? 'text-slate-500' : 'text-blue-100'} font-medium opacity-80 italic`}>
-                              {trainingCancelled ? 'Session cancelled for this week' : 'Parent led training session'}
-                            </p>
+                            <Users className="absolute -bottom-4 -right-4 w-28 h-28 text-white opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-500" />
                           </div>
-                          <Users className="absolute -bottom-4 -right-4 w-28 h-28 text-white opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-500" />
-                        </div>
+                        )) : (
+                          <div className={`${trainingCancelled ? 'bg-slate-200 grayscale' : 'bg-emjsc-navy'} p-6 rounded-3xl shadow-xl border-l-4 ${trainingCancelled ? 'border-slate-400' : 'border-emjsc-red'} text-white relative overflow-hidden group transition-all duration-500`}>
+                            <div className="relative z-10 space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className={`text-[10px] font-bold ${trainingCancelled ? 'text-slate-600 bg-slate-100' : 'text-emjsc-red bg-white'} px-2 py-1 rounded inline-block uppercase tracking-widest`}>
+                                  {trainingLocation}
+                                </p>
+                                <span className={`text-[10px] font-bold ${trainingCancelled ? 'text-slate-500' : 'text-blue-100'} uppercase tracking-tight`}>
+                                  {getNextTrainingDate()}
+                                </span>
+                                {trainingCancelled && (
+                                  <span className="text-[10px] bg-red-600 text-white px-2 py-1 rounded font-black uppercase animate-pulse">Cancelled</span>
+                                )}
+                              </div>
+                              <h3 className="text-3xl font-black uppercase leading-none">Wednesday 5 PM</h3>
+                              <p className={`text-xs ${trainingCancelled ? 'text-slate-500' : 'text-blue-100'} font-medium opacity-80 italic`}>
+                                {trainingCancelled ? 'Session cancelled for this week' : 'Parent led training session'}
+                              </p>
+                            </div>
+                            <Users className="absolute -bottom-4 -right-4 w-28 h-28 text-white opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+                          </div>
+                        )}
                       </section>
                       
                       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
@@ -2517,11 +2535,14 @@ export default function App() {
                           onAddGame={addGame}
                           trainingCancelled={trainingCancelled}
                           onToggleTraining={toggleTraining}
+                          trainingSchedule={trainingSchedule}
+                          onUpdateTrainingSchedule={updateTrainingSchedule}
                           trainingLocation={trainingLocation}
                           onUpdateTrainingLocation={updateTrainingLocation}
                           homeGround={homeGround}
                           onUpdateHomeGround={updateHomeGround}
-                          onRefreshTravelTimes={refreshTravelTimes}
+                          teamLogoUrl={teamLogoUrl}
+                          onUpdateTeamLogoUrl={updateTeamLogoUrl}
                           onBulkSync={bulkSyncFixtures}
                           onFetchDribl={fetchDriblFixtures}
                           onConfirmSync={confirmSyncFixtures}

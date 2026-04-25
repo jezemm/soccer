@@ -10,6 +10,7 @@ import { AdminModeration } from './AdminModeration';
 import { MatchEditor } from './MatchEditor';
 import { DutyManager } from './DutyManager';
 import { FaqManager } from './HelpView';
+import { CLUB_LOGO } from '../lib/constants';
 
 function AdminDutySelector({ label, value, onSelect, squad = [] }: any) {
   return (
@@ -594,6 +595,122 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   );
 }
 
+// ── TrainingScheduleManager ───────────────────────────────────────────────────
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function TrainingScheduleManager({ schedule, onUpdate, userRole }: { schedule: any[]; onUpdate: (s: any[]) => void; userRole: string }) {
+  const isManager = userRole !== 'coach';
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newDay, setNewDay] = React.useState('Wednesday');
+  const [newTime, setNewTime] = React.useState('17:00');
+  const [newLocation, setNewLocation] = React.useState('');
+
+  const toggleCancel = (id: string) => {
+    onUpdate(schedule.map(s => s.id === id ? { ...s, cancelled: !s.cancelled } : s));
+  };
+
+  const deleteSession = (id: string) => {
+    if (!window.confirm('Remove this training session?')) return;
+    onUpdate(schedule.filter(s => s.id !== id));
+  };
+
+  const addSession = () => {
+    if (!newLocation.trim()) return;
+    const id = `${newDay.toLowerCase()}_${newTime.replace(':', '')}_${Date.now()}`;
+    onUpdate([...schedule, { id, day: newDay, time: newTime, location: newLocation.trim(), cancelled: false }]);
+    setNewLocation(''); setShowAdd(false);
+  };
+
+  // Format HH:MM to "5:00 PM"
+  const fmtTime = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
+
+  return (
+    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Weekly Training Schedule</h3>
+        {isManager && (
+          <button onClick={() => setShowAdd(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emjsc-navy text-white text-[9px] font-black uppercase rounded-xl active:scale-95 transition-all">
+            <Plus className="w-3.5 h-3.5" />{showAdd ? 'Cancel' : 'Add Session'}
+          </button>
+        )}
+      </div>
+
+      {/* Add form */}
+      {showAdd && isManager && (
+        <div className="px-6 py-4 bg-green-50 border-b border-green-100 space-y-3">
+          <p className="text-[8px] font-black uppercase text-green-700 tracking-widest">New Training Session</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <label className="text-[8px] font-black uppercase text-slate-400">Day</label>
+              <select value={newDay} onChange={e => setNewDay(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none">
+                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] font-black uppercase text-slate-400">Time</label>
+              <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] font-black uppercase text-slate-400">Location</label>
+              <input type="text" value={newLocation} onChange={e => setNewLocation(e.target.value)}
+                placeholder="Gardiner Park" autoFocus
+                className="w-full p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-emjsc-navy outline-none" />
+            </div>
+          </div>
+          <button onClick={addSession} disabled={!newLocation.trim()}
+            className="w-full bg-green-600 text-white text-[9px] font-black uppercase py-2.5 rounded-xl active:scale-[0.98] transition-all disabled:opacity-40">
+            Add Session
+          </button>
+        </div>
+      )}
+
+      {/* Session list */}
+      {schedule.length === 0 ? (
+        <p className="text-center text-[10px] font-black uppercase text-slate-300 py-8 italic">No sessions configured</p>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {schedule.map((s: any) => (
+            <div key={s.id} className={`flex items-center gap-3 px-6 py-4 ${s.cancelled ? 'bg-red-50' : ''}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-black text-emjsc-navy uppercase">{s.day}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{fmtTime(s.time)}</span>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{s.location}</span>
+                  {s.cancelled && (
+                    <span className="text-[8px] font-black uppercase bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse">Cancelled</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => toggleCancel(s.id)}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${s.cancelled ? 'bg-green-500 text-white' : 'bg-emjsc-red text-white'}`}
+                >
+                  {s.cancelled ? 'Re-open' : 'Cancel'}
+                </button>
+                {isManager && (
+                  <button onClick={() => deleteSession(s.id)}
+                    className="p-2 text-slate-400 hover:text-emjsc-red hover:bg-red-50 rounded-xl transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminView({
   userName,
   games,
@@ -609,11 +726,14 @@ export function AdminView({
   onSaveGame,
   trainingCancelled,
   onToggleTraining,
+  trainingSchedule = [],
+  onUpdateTrainingSchedule,
   trainingLocation,
   onUpdateTrainingLocation,
   homeGround,
   onUpdateHomeGround,
-  onRefreshTravelTimes,
+  teamLogoUrl,
+  onUpdateTeamLogoUrl,
   onBulkSync,
   onFetchDribl,
   onConfirmSync,
@@ -665,8 +785,9 @@ export function AdminView({
   onForceCalendarRefresh,
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
+  const [fixtureIntegrationOpen, setFixtureIntegrationOpen] = useState(false);
   const isCoach = userRole === 'coach';
-  const [activeTab, setActiveTab] = useState(isCoach ? 'content' : 'matches');
+  const [activeTab, setActiveTab] = useState(isCoach ? 'content' : 'fixture');
 
   if (!isLoggedIn) {
     return (
@@ -709,14 +830,16 @@ export function AdminView({
 
   const tabs = isCoach
     ? [
-        { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
+        { id: 'content', label: 'Coaching', icon: <MessageCircle className="w-3 h-3" /> },
         { id: 'playerduties', label: 'Player Duties', icon: <Users className="w-3 h-3" /> },
+        { id: 'training', label: 'Training', icon: <Calendar className="w-3 h-3" /> },
       ]
     : [
-        { id: 'matches', label: 'Match Day', icon: <Calendar className="w-3 h-3" /> },
-        { id: 'content', label: 'Coach Wrap', icon: <MessageCircle className="w-3 h-3" /> },
+        { id: 'fixture', label: 'Fixture', icon: <Calendar className="w-3 h-3" /> },
+        { id: 'content', label: 'Coaching', icon: <MessageCircle className="w-3 h-3" /> },
+        { id: 'training', label: 'Training', icon: <CalendarDays className="w-3 h-3" /> },
         ...(messagingEnabled ? [{ id: 'moderate', label: 'Moderation', icon: <Shield className="w-3 h-3" /> }] : []),
-        { id: 'duties', label: 'Duty Manager', icon: <Utensils className="w-3 h-3" /> },
+        { id: 'duties', label: 'Duties', icon: <Utensils className="w-3 h-3" /> },
         { id: 'squad', label: 'Squad', icon: <Users className="w-3 h-3" /> },
         { id: 'faq', label: 'FAQ', icon: <HelpCircle className="w-3 h-3" /> },
         { id: 'features', label: 'Features', icon: <Lightbulb className="w-3 h-3" />, badge: newFeatureCount },
@@ -728,12 +851,20 @@ export function AdminView({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black tracking-tight text-emjsc-navy uppercase">Admin Hub</h2>
-          {trainingCancelled && (
-            <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-emjsc-red animate-pulse" />
-              <span className="text-[8px] font-black uppercase text-slate-500">Training Cancelled</span>
-            </div>
-          )}
+          {(() => {
+            const cancelled = (trainingSchedule as any[]).filter((s: any) => s.cancelled);
+            const showBadge = cancelled.length > 0 || (trainingSchedule.length === 0 && trainingCancelled);
+            if (!showBadge) return null;
+            const label = cancelled.length > 0
+              ? cancelled.map((s: any) => `${s.day} ${s.time}`).join(' & ') + ' Cancelled'
+              : 'Training Cancelled';
+            return (
+              <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-emjsc-red animate-pulse" />
+                <span className="text-[8px] font-black uppercase text-slate-500">{label}</span>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-1 overflow-x-auto pb-2 -mx-2 px-2 custom-scrollbar no-scrollbar">
@@ -799,26 +930,56 @@ export function AdminView({
           </motion.div>
         )}
 
-        {activeTab === 'matches' && (
-          <motion.div key="matches" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Match Day Operations</h3>
-              <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none">Training Status</p>
-                  <p className="text-[8px] text-slate-400 font-bold uppercase">{trainingCancelled ? 'Currently closed' : 'Scheduled as normal'}</p>
-                </div>
-                <button
-                  onClick={() => onToggleTraining(!trainingCancelled)}
-                  className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md ${trainingCancelled ? 'bg-green-500 text-white' : 'bg-emjsc-red text-white'}`}
-                >
-                  {trainingCancelled ? 'Open' : 'Cancel'}
-                </button>
-              </div>
-              <button onClick={onRefreshTravelTimes} className="w-full bg-slate-50 text-emjsc-navy border border-slate-200 font-black py-3 rounded-2xl uppercase tracking-[0.1em] text-[10px] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Sync Travel Times
+        {activeTab === 'training' && (
+          <motion.div key="training" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
+            <TrainingScheduleManager
+              schedule={trainingSchedule}
+              onUpdate={onUpdateTrainingSchedule}
+              userRole={userRole}
+            />
+          </motion.div>
+        )}
+
+        {activeTab === 'fixture' && (
+          <motion.div key="fixture" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
+
+            {/* Fixture Integration — accordion, collapsed by default */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setFixtureIntegrationOpen(v => !v)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors"
+              >
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fixture Integration</h3>
+                {fixtureIntegrationOpen
+                  ? <X className="w-4 h-4 text-slate-400" />
+                  : <Plus className="w-4 h-4 text-slate-400" />}
               </button>
+              {fixtureIntegrationOpen && (
+                <div className="px-6 pb-6 space-y-4 border-t border-slate-100">
+                  <div className="pt-4">
+                    <DriblScrapePanel onFetchDribl={onFetchDribl} onConfirmSync={onConfirmSync} driblCache={driblCache} onSaveDriblCache={onSaveDriblCache} />
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
+                    <div className="relative flex justify-center"><span className="bg-white px-3 text-[9px] font-black uppercase tracking-[0.15em] text-slate-300">or paste JSON</span></div>
+                  </div>
+                  <textarea
+                    value={bulkJson}
+                    onChange={(e) => setBulkJson(e.target.value)}
+                    placeholder='Paste fixture JSON here...'
+                    className="w-full h-32 p-4 bg-slate-50 border border-slate-100 rounded-3xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none font-mono"
+                  />
+                  <button onClick={() => { onBulkSync(bulkJson); setBulkJson(''); }} className="w-full bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3.5 rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-slate-200">
+                    <RefreshCw className="w-4 h-4" />Sync JSON Fixtures
+                  </button>
+                  <button
+                    onClick={() => { if (window.confirm("CRITICAL WARNING: This will PERMANENTLY DELETE the entire match schedule from the database. This cannot be undone. Proceed?")) { onClearSchedule(); } }}
+                    className="w-full bg-red-100 text-emjsc-red text-[10px] font-black uppercase py-3.5 rounded-2xl transition-all flex items-center justify-center gap-3 border border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" />Wipe Full Schedule
+                  </button>
+                </div>
+              )}
             </div>
 
             <MatchEditor
@@ -832,37 +993,6 @@ export function AdminView({
               squad={squad}
             />
 
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fixture Integration</h3>
-              <DriblScrapePanel onFetchDribl={onFetchDribl} onConfirmSync={onConfirmSync} driblCache={driblCache} onSaveDriblCache={onSaveDriblCache} />
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-100" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-[9px] font-black uppercase tracking-[0.15em] text-slate-300">or paste JSON</span>
-                </div>
-              </div>
-
-              <textarea
-                value={bulkJson}
-                onChange={(e) => setBulkJson(e.target.value)}
-                placeholder='Paste fixture JSON here...'
-                className="w-full h-40 p-5 bg-slate-50 border border-slate-100 rounded-3xl text-[10px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none font-mono"
-              />
-              <button onClick={() => { onBulkSync(bulkJson); setBulkJson(''); }} className="w-full bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-slate-200">
-                <RefreshCw className="w-4 h-4" />
-                Sync JSON Fixtures
-              </button>
-              <button
-                onClick={() => { if (window.confirm("CRITICAL WARNING: This will PERMANENTLY DELETE the entire match schedule from the database. This cannot be undone. Proceed?")) { onClearSchedule(); } }}
-                className="w-full bg-red-100 text-emjsc-red text-[10px] font-black uppercase py-4 rounded-2xl transition-all flex items-center justify-center gap-3 border border-red-200"
-              >
-                <Trash2 className="w-4 h-4" />
-                Wipe Full Schedule
-              </button>
-            </div>
           </motion.div>
         )}
 
@@ -1078,8 +1208,27 @@ export function AdminView({
                   <p className="text-[8px] text-slate-400 italic px-1 font-bold">Used for calculating travel estimates for away games.</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Wednesday Training Venue</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Default Training Venue</label>
                   <input type="text" defaultValue={trainingLocation} onBlur={(e) => onUpdateTrainingLocation(e.target.value)} placeholder="e.g. Gardiner Park" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Team Logo URL</label>
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={teamLogoUrl || CLUB_LOGO}
+                      alt="Team logo preview"
+                      className="w-12 h-12 object-contain rounded-xl border border-slate-200 bg-slate-50 p-1 shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <input
+                      type="url"
+                      key={teamLogoUrl || CLUB_LOGO}
+                      defaultValue={teamLogoUrl || CLUB_LOGO}
+                      onBlur={(e) => onUpdateTeamLogoUrl(e.target.value.trim())}
+                      className="flex-1 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
+                    />
+                  </div>
+                  <p className="text-[8px] text-slate-400 italic px-1 font-bold">Leave as-is to keep the default, or paste a new URL to override.</p>
                 </div>
               </div>
               <div className="pt-6 border-t border-slate-50 space-y-4">

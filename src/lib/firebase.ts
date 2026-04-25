@@ -83,6 +83,14 @@ export interface Availability {
   updatedAt: any;
 }
 
+export interface TrainingSession {
+  id: string;
+  day: string;       // e.g. 'Wednesday'
+  time: string;      // HH:MM, e.g. '17:00'
+  location: string;
+  cancelled: boolean;
+}
+
 export interface DutyConfig {
   id: string; // duty name
   label: string;

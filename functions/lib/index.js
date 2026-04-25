@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cafesNearby = exports.fixturesICS = void 0;
+exports.cafesNearby = exports.travelTime = exports.fixturesICS = void 0;
 // Must be first — forces Date local methods to use Melbourne time
 process.env.TZ = "Australia/Melbourne";
 const https_1 = require("firebase-functions/v2/https");
@@ -194,12 +194,50 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
             "END:VCALENDAR",
         ].join("\r\n");
         res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.setHeader("Cache-Control", "no-cache, no-store");
         res.status(200).send(ics);
     }
     catch (err) {
         console.error("fixturesICS error:", err);
         res.status(500).send("Error generating calendar");
+    }
+});
+exports.travelTime = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public" }, async (req, res) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const origin = (req.query.origin || "").trim();
+    const destination = (req.query.destination || "").trim();
+    const departureParam = req.query.departureTime || "";
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!origin || !destination || !apiKey) {
+        res.status(200).json({ minutes: null });
+        return;
+    }
+    // Use actual departure time if it's in the future, otherwise "now"
+    const departureSecs = parseInt(departureParam, 10);
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const departureTime = departureSecs > nowSecs ? departureSecs : nowSecs;
+    try {
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json` +
+            `?origins=${encodeURIComponent(origin)}` +
+            `&destinations=${encodeURIComponent(destination)}` +
+            `&mode=driving` +
+            `&departure_time=${departureTime}` +
+            `&traffic_model=best_guess` +
+            `&key=${apiKey}`;
+        const data = await fetch(url).then((r) => r.json());
+        const element = (_c = (_b = (_a = data.rows) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.elements) === null || _c === void 0 ? void 0 : _c[0];
+        if ((element === null || element === void 0 ? void 0 : element.status) === "OK") {
+            const seconds = (_g = (_e = (_d = element.duration_in_traffic) === null || _d === void 0 ? void 0 : _d.value) !== null && _e !== void 0 ? _e : (_f = element.duration) === null || _f === void 0 ? void 0 : _f.value) !== null && _g !== void 0 ? _g : 0;
+            res.status(200).json({ minutes: Math.ceil(seconds / 60) });
+        }
+        else {
+            console.warn("Distance Matrix element status:", element === null || element === void 0 ? void 0 : element.status, data);
+            res.status(200).json({ minutes: null });
+        }
+    }
+    catch (err) {
+        console.error("travelTime error:", err);
+        res.status(200).json({ minutes: null });
     }
 });
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -212,48 +250,63 @@ function haversineKm(lat1, lon1, lat2, lon2) {
             Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+const CAFE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+function venueCacheKey(venue) {
+    return venue.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100);
+}
 exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public" }, async (req, res) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f, _g;
     const venue = (req.query.venue || "").trim();
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!venue || !apiKey) {
-        res.status(200).json({ cafes: [] });
+        res.status(200).json({ cafes: [], cached: false });
         return;
     }
+    const db = (0, firestore_1.getFirestore)(DATABASE_ID);
+    const cacheKey = venueCacheKey(venue);
+    const cacheRef = db.collection("cafeCache").doc(cacheKey);
     try {
-        // 1. Geocode venue → lat/lng
-        const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json` +
-            `?address=${encodeURIComponent(venue)}&key=${apiKey}`;
-        const geoData = await fetch(geoUrl).then((r) => r.json());
-        const venueLoc = (_c = (_b = (_a = geoData.results) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.geometry) === null || _c === void 0 ? void 0 : _c.location;
+        // 1. Check Firestore cache
+        const cached = await cacheRef.get();
+        if (cached.exists) {
+            const data = cached.data();
+            const age = Date.now() - ((_c = (_b = (_a = data.fetchedAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) !== null && _c !== void 0 ? _c : 0);
+            if (age < CAFE_CACHE_TTL_MS) {
+                res.status(200).json({ cafes: (_d = data.cafes) !== null && _d !== void 0 ? _d : [], cached: true });
+                return;
+            }
+        }
+        // 2. Geocode venue → lat/lng
+        const geoData = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(venue)}&key=${apiKey}`).then((r) => r.json());
+        const venueLoc = (_g = (_f = (_e = geoData.results) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.geometry) === null || _g === void 0 ? void 0 : _g.location;
         if (!venueLoc) {
-            res.status(200).json({ cafes: [] });
+            res.status(200).json({ cafes: [], cached: false });
             return;
         }
-        // 2. Places Nearby Search — cafes within 2 km
-        const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
-            `?location=${venueLoc.lat},${venueLoc.lng}&radius=2000&type=cafe&key=${apiKey}`;
-        const placesData = await fetch(placesUrl).then((r) => r.json());
+        // 3. Places Nearby Search — cafes within 2 km
+        const placesData = await fetch(`https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
+            `?location=${venueLoc.lat},${venueLoc.lng}&radius=2000&type=cafe&key=${apiKey}`).then((r) => r.json());
         const cafes = (placesData.results || [])
             .filter((p) => p.business_status === "OPERATIONAL" && p.rating)
             .map((p) => {
             var _a, _b, _c, _d, _e, _f, _g;
             const cafeLat = (_c = (_b = (_a = p.geometry) === null || _a === void 0 ? void 0 : _a.location) === null || _b === void 0 ? void 0 : _b.lat) !== null && _c !== void 0 ? _c : venueLoc.lat;
             const cafeLng = (_f = (_e = (_d = p.geometry) === null || _d === void 0 ? void 0 : _d.location) === null || _e === void 0 ? void 0 : _e.lng) !== null && _f !== void 0 ? _f : venueLoc.lng;
-            const distanceKm = Math.round(haversineKm(venueLoc.lat, venueLoc.lng, cafeLat, cafeLng) * 10) / 10;
             return {
                 name: p.name,
                 address: p.vicinity,
                 rating: (_g = p.rating) !== null && _g !== void 0 ? _g : null,
-                distanceKm,
+                distanceKm: Math.round(haversineKm(venueLoc.lat, venueLoc.lng, cafeLat, cafeLng) * 10) / 10,
                 mapsUrl: `https://www.google.com/maps/place/?q=place_id:${p.place_id}`,
             };
         });
-        res.status(200).json({ cafes });
+        // 4. Store in Firestore cache
+        await cacheRef.set({ venue, cafes, fetchedAt: new Date() });
+        res.status(200).json({ cafes, cached: false });
     }
     catch (err) {
-        console.error("nearbyPlaces error:", err);
-        res.status(200).json({ cafes: [] });
+        console.error("cafesNearby error:", err);
+        res.status(200).json({ cafes: [], cached: false });
     }
 });
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw } from 'lucide-react';
+import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay } from '../lib/constants';
 import type { NearbyCafe, CafeSortMode } from '../lib/constants';
@@ -63,14 +63,19 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const isUnavailable = availabilities.some((a: any) => a.playerName === user.displayName && a.dateKey === dateKey && a.isUnavailable);
   const matchAvailabilities = availabilities.filter((a: any) => a.dateKey === dateKey && a.isUnavailable);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }); }, []);
+
   const [cafeSort, setCafeSort] = useState<CafeSortMode>('weighted');
   const [cafes, setCafes] = useState<NearbyCafe[]>([]);
-  const [cafesStatus, setCafesStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
 
   const gameLocation = game.location || homeGround || '';
   const venueName = getVenueName(gameLocation);
 
-  const fetchCafes = () => {
+  const [cafesStatus, setCafesStatus] = useState<'idle' | 'loading' | 'done' | 'error'>(
+    () => venueName ? 'loading' : 'idle'
+  );
+
+  const fetchCafes = useCallback(() => {
     if (!venueName) return;
     setCafesStatus('loading');
     setCafes([]);
@@ -82,11 +87,46 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         setCafesStatus('done');
       })
       .catch(() => setCafesStatus('error'));
-  };
+  }, [venueName]);
 
-  useEffect(() => { fetchCafes(); }, [venueName]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchCafes(); }, [fetchCafes]);
 
   const displayCafes = sortCafes(cafes, cafeSort, 3);
+
+  // My-location travel time
+  const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'fetching' | 'done' | 'error'>('idle');
+  const [myTravelMinutes, setMyTravelMinutes] = useState<number | null>(null);
+  const [myTravelError, setMyTravelError] = useState<string | null>(null);
+
+  const getMyTravelTime = () => {
+    if (!venueName) return;
+    setMyTravelStatus('locating');
+    setMyTravelError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyTravelStatus('fetching');
+        const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
+        const departureSecs = Math.floor((date.getTime() - 30 * 60000) / 1000);
+        fetch(
+          `${FUNCTIONS_BASE}/travelTime` +
+          `?origin=${encodeURIComponent(origin)}` +
+          `&destination=${encodeURIComponent(venueName + ' Melbourne VIC')}` +
+          `&departureTime=${departureSecs}`
+        )
+          .then(r => r.json())
+          .then(data => {
+            if (data.minutes) { setMyTravelMinutes(data.minutes); setMyTravelStatus('done'); }
+            else { setMyTravelError('No route found'); setMyTravelStatus('error'); }
+          })
+          .catch(() => { setMyTravelError('Could not calculate route'); setMyTravelStatus('error'); });
+      },
+      (err) => {
+        setMyTravelError(err.code === 1 ? 'Location permission denied' : 'Could not get location');
+        setMyTravelStatus('error');
+      },
+      { timeout: 10000 }
+    );
+  };
 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -160,6 +200,44 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 {formatVenueDisplay(game.location)}
               </a>
             </p>
+            {!game.isHome && game.travelTimeMinutes && myTravelStatus !== 'done' && (
+              <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
+                <Car className="w-4 h-4 text-emjsc-red" />
+                ~{game.travelTimeMinutes} min from home ground
+              </p>
+            )}
+            {/* My-location travel time */}
+            {venueName && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {myTravelStatus === 'idle' || myTravelStatus === 'error' ? (
+                  <button
+                    onClick={getMyTravelTime}
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emjsc-navy bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors active:scale-95"
+                  >
+                    <Car className="w-3.5 h-3.5 text-emjsc-red" />
+                    {myTravelStatus === 'error' ? 'Try again' : 'Travel time from my location'}
+                  </button>
+                ) : myTravelStatus === 'locating' || myTravelStatus === 'fetching' ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    {myTravelStatus === 'locating' ? 'Getting location…' : 'Calculating route…'}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-slate-700 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
+                      <Car className="w-4 h-4 text-emjsc-red" />
+                      ~{myTravelMinutes} min from your location
+                    </p>
+                    <button onClick={getMyTravelTime} className="p-1 rounded-lg hover:bg-slate-100 transition-colors" title="Refresh">
+                      <RefreshCw className="w-3 h-3 text-slate-400" />
+                    </button>
+                  </div>
+                )}
+                {myTravelStatus === 'error' && myTravelError && (
+                  <span className="text-[9px] font-bold text-emjsc-red uppercase">{myTravelError}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
