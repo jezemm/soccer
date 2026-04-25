@@ -2344,6 +2344,17 @@ export default function App() {
                   </div>
                 )}
 
+                {view === 'game' && !gamesLoaded && (
+                  <div className="flex items-center justify-center py-20 text-slate-400 text-sm">Loading match…</div>
+                )}
+
+                {view === 'game' && gamesLoaded && !selectedGame && (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                    <p className="text-slate-500 text-sm">Match not found.</p>
+                    <button onClick={() => navigate('/schedule')} className="text-xs text-emjsc-navy underline">Back to Schedule</button>
+                  </div>
+                )}
+
                 {view === 'game' && selectedGame && (
                   <div className="max-w-4xl mx-auto">
                     <GameDetailView

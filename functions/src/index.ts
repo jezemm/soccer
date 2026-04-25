@@ -83,8 +83,8 @@ export const fixturesICS = onRequest(
 
         const start = new Date(g.date);
         const end = new Date(start.getTime() + 60 * 60 * 1000);
-        const arrivalTime = new Date(start.getTime() - 30 * 60 * 1000)
-          .toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+        const arrival = new Date(start.getTime() - 30 * 60 * 1000);
+        const arrivalTime = arrival.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
         const kickoffTime = start.toLocaleTimeString("en-AU", {
           hour: "2-digit",
           minute: "2-digit",
@@ -177,10 +177,25 @@ export const fixturesICS = onRequest(
             `DESCRIPTION:${desc}`,
             // Alert fires 60 min before kick-off = 30 min before arrival
             "BEGIN:VALARM",
-            "TRIGGER:-PT60M",
+            "TRIGGER;VALUE=DURATION:-PT60M",
             "ACTION:DISPLAY",
             `DESCRIPTION:⚽ Match reminder — arrive by ${arrivalTime} at ${venueName || locationName || "the venue"}`,
             "END:VALARM",
+            "END:VEVENT",
+          ].join("\r\n")
+        );
+
+        // Travel event: 30 min block before kick-off (arrival time → kick-off)
+        events.push(
+          [
+            "BEGIN:VEVENT",
+            `UID:${doc.id}-travel@soccerhub.jeremymarks.com.au`,
+            `DTSTAMP:${now}`,
+            `DTSTART;TZID=${TZID}:${toLocal(arrival)}`,
+            `DTEND;TZID=${TZID}:${toLocal(start)}`,
+            `SUMMARY:${escIcs(`🚙 Travel to EMJSC Soccer – vs ${opponentShort}`)}`,
+            `LOCATION:${escIcs(locationFull)}`,
+            `URL:${gameUrl}`,
             "END:VEVENT",
           ].join("\r\n")
         );
