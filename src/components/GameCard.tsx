@@ -80,14 +80,14 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
     <motion.div
       whileTap={dimmed ? undefined : { scale: 0.98 }}
       onClick={onClick}
-      className={`bg-white p-5 rounded-[1.75rem] shadow-sm border flex flex-col transition-all gap-3 ${
+      className={`bg-white rounded-[1.75rem] shadow-sm border flex flex-col transition-all ${compact ? 'p-3.5 gap-2' : 'p-5 gap-3'} ${
         dimmed
           ? 'opacity-50 grayscale cursor-pointer border-slate-200'
           : `cursor-pointer ${isSwapPending ? 'border-orange-300 bg-orange-50/30' : isMissingDuties ? 'border-amber-200' : 'border-slate-200 hover:border-emjsc-navy'}`
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+        <div className={`flex flex-col flex-1 min-w-0 ${compact ? 'gap-1' : 'gap-2.5'}`}>
           {/* Date / home-away / unavailable count */}
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -103,7 +103,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
 
           {/* Opponent */}
           <div className="leading-tight">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-xl font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
+            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className={`font-black text-emjsc-navy uppercase italic ${compact ? 'text-base' : 'text-xl'}`}>Vs {club || team}</p>{club && team && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
           </div>
 
           {/* Full venue address + navigate — next card only */}
@@ -142,7 +142,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2 shrink-0">
+        <div className={`flex flex-col items-end shrink-0 ${compact ? 'gap-1' : 'gap-2'}`}>
           {game.opponentLogo && (
             <img
               src={game.opponentLogo}
@@ -194,7 +194,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
       </div>
 
       {onSignUp && applicableDuties.length > 0 && (
-        <div className="border-t border-slate-100 pt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+        <div className={`border-t border-slate-100 ${compact ? 'pt-2 space-y-1.5' : 'pt-3 space-y-2'}`} onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">Duties</span>
             <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
@@ -203,7 +203,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
               {isSwapPending ? 'Swap Needed' : isMissingDuties ? 'Help Wanted' : 'Ready'}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className={`flex flex-wrap ${compact ? 'gap-1.5' : 'gap-2'}`}>
             {applicableDuties.map((duty: any) => {
               const assignee = getAssignee(duty);
               const swap = getSwap(duty);
