@@ -1765,7 +1765,7 @@ export default function App() {
                                     )}
                                   </div>
                                   <div className="space-y-1">
-                                    {(() => { const { club, team } = splitOpponent(game.opponent); return <>{club && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{club}</p>}<h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {team}</h3></>; })()}
+                                    {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
                                     <a
                                       href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
                                       target="_blank"
