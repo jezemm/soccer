@@ -1928,16 +1928,16 @@ export default function App() {
                               <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                 Match Fixture{anyFilterActive ? ` · ${fixtureGames.length} result${fixtureGames.length !== 1 ? 's' : ''}` : ''}
                               </h2>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+                              <div className="flex flex-col gap-4">
                                 {!gamesLoaded ? (
-                                  <div className="flex flex-col items-center justify-center py-16 gap-3 col-span-full">
+                                  <div className="flex flex-col items-center justify-center py-16 gap-3 w-full">
                                     <div className="w-8 h-8 rounded-full border-4 border-slate-100 border-t-emjsc-red animate-spin" />
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
                                   </div>
                                 ) : games.length === 0 ? (
                                   <EmptyState />
                                 ) : fixtureGames.length === 0 ? (
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center col-span-full">No matches</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center w-full">No matches</p>
                                 ) : (
                                   fixtureGames.map((game: GameType) => (
                                     <GameCard
