@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Check } from 'lucide-react';
-import { TEAM_SQUAD } from '../lib/constants';
-
 export function DutyManager({
   duties = [],
   onAdd,
@@ -10,7 +8,8 @@ export function DutyManager({
   coachChild,
   onUpdateCoachChild,
   coachExemptDuties = [],
-  onUpdateCoachExemptDuties
+  onUpdateCoachExemptDuties,
+  squad = [],
 }: any) {
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<'player' | 'parent'>('player');
@@ -199,7 +198,7 @@ export function DutyManager({
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold text-emjsc-navy outline-none focus:ring-1 focus:ring-emjsc-navy"
               >
                 <option value="">None Selected</option>
-                {TEAM_SQUAD.map(p => (
+                {squad.map((p: any) => (
                   <option key={p.name} value={p.name}>{p.name}</option>
                 ))}
               </select>

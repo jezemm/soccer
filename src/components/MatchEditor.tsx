@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Trash2, Users, RefreshCw } from 'lucide-react';
-import { TEAM_SQUAD } from '../lib/constants';
-
-export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabilities = [], dutiesConfig = [], onDeleteGame }: any) {
+export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabilities = [], dutiesConfig = [], onDeleteGame, squad = [] }: any) {
   const [selectedGameId, setSelectedGameId] = useState(games[0]?.id || '');
   const [venue, setVenue] = useState('');
   const [date, setDate] = useState('');
@@ -199,7 +197,7 @@ export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabili
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none"
                     >
                       <option value="">(Empty)</option>
-                      {TEAM_SQUAD.map(p => (
+                      {squad.map((p: any) => (
                         <option key={p.name} value={p.name}>{p.name}</option>
                       ))}
                     </select>

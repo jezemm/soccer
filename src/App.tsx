@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, 
@@ -53,8 +54,38 @@ import { AdminModeration } from './components/AdminModeration';
 import { MatchEditor } from './components/MatchEditor';
 import { DutyManager } from './components/DutyManager';
 import { AdminView } from './components/AdminView';
-import { ProfileView } from './components/ProfileView';
 import { MessagesView } from './components/MessagesView';
+
+function ChangePasswordForm({ playerName, onSave }: { playerName: string; onSave: (next: string) => Promise<string | null> }) {
+  const [open, setOpen] = React.useState(false);
+  const [newPw, setNewPw] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
+  const reset = () => { setOpen(false); setNewPw(''); setError(null); setSaved(false); };
+  if (!open) return (
+    <button onClick={() => setOpen(true)}
+      className="text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-slate-400 transition-all active:scale-95 mt-1">
+      Change Password
+    </button>
+  );
+  return (
+    <div className="pt-3 border-t border-slate-100 space-y-2">
+      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Change Password</p>
+      {error && <p className="text-[9px] font-black text-emjsc-red uppercase">{error}</p>}
+      {saved && <p className="text-[9px] font-black text-green-600 uppercase">Password updated!</p>}
+      <input type="password" placeholder="New password" value={newPw}
+        onChange={e => { setNewPw(e.target.value); setError(null); setSaved(false); }}
+        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-emjsc-navy" />
+      <div className="flex gap-2">
+        <button onClick={reset} className="flex-1 py-2 text-[9px] font-black uppercase bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all">Cancel</button>
+        <button onClick={async () => {
+          const err = await onSave(newPw);
+          if (err) { setError(err); } else { setSaved(true); setNewPw(''); setTimeout(reset, 1500); }
+        }} className="flex-1 py-2 text-[9px] font-black uppercase bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all">Save</button>
+      </div>
+    </div>
+  );
+}
 
 let mapsLoader: Promise<void> | null = null;
 function loadGoogleMaps(apiKey: string): Promise<void> {
@@ -79,13 +110,38 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [gamesLoaded, setGamesLoaded] = useState(false);
   const [games, setGames] = useState<GameType[]>([]);
-  const [view, setView] = useState<'fixtures' | 'squad' | 'game' | 'admin' | 'profile' | 'messages' | 'help'>('fixtures');
+  const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
+  const [squad, setSquad] = useState<{ name: string; fact: string }[]>(TEAM_SQUAD);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const PATH_TO_VIEW: Record<string, string> = {
+    '/': 'fixtures', '/schedule': 'fixtures', '/squad': 'squad',
+    '/admin': 'admin', '/messages': 'messages', '/help': 'help',
+  };
+  const routeView = PATH_TO_VIEW[location.pathname] ?? 'fixtures';
+  const view = (routeView === 'fixtures' && selectedGame) ? 'game' : routeView;
+  const setView = (v: string) => {
+    const VIEW_TO_PATH: Record<string, string> = {
+      fixtures: '/schedule', squad: '/squad', admin: '/admin', messages: '/messages', help: '/help',
+    };
+    if (v === 'game') return;
+    navigate(VIEW_TO_PATH[v] ?? '/schedule');
+    if (v !== 'fixtures') setSelectedGame(null);
+  };
+  const [editingSkills, setEditingSkills] = useState<string | null>(null);
+  const DEFAULT_PLAYER_PASSWORDS: Record<string, string> = {
+    "Zephyr Y": "ATTITUDE26", "Harry S": "CREATIVE26", "Myles H": "SMILE26",
+    "Tanush P": "VISION26", "Joshua M": "SPIRIT26", "Thomas B": "FOCUS26",
+    "Benjamin C": "ENERGY26", "Hugo D": "TOUCH26", "Harvey M": "SPEED26", "Julian B": "TEAMWORK26"
+  };
+  const [passwords, setPasswords] = useState<{ players: Record<string, string>; coach: string; manager: string }>({
+    players: DEFAULT_PLAYER_PASSWORDS, coach: 'admin123', manager: 'admin123'
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('teamtrack_admin') === 'true');
   const [adminPass, setAdminPass] = useState('');
-  const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'completed'>('upcoming');
   const [venueFilter, setVenueFilter] = useState<'all' | 'home' | 'away'>('all');
   const [dutyFilter, setDutyFilter] = useState(false);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
@@ -93,7 +149,7 @@ export default function App() {
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
   const [coachChild, setCoachChild] = useState<string | null>(null);
   const [coachExemptDuties, setCoachExemptDuties] = useState<string[]>([]);
-  const [messagingEnabled, setMessagingEnabled] = useState(true);
+  const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [targetPlayerProfile, setTargetPlayerProfile] = useState<string | null>(null);
   const [targetAdminRole, setTargetAdminRole] = useState<'Team Manager' | 'Coach' | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { skills?: string, photoUrl?: string }>>({});
@@ -232,6 +288,52 @@ export default function App() {
     );
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'passwords'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setPasswords(prev => ({
+          players: { ...prev.players, ...(data.players || {}) },
+          coach: data.coach || prev.coach,
+          manager: data.manager || prev.manager,
+        }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubSquad = onSnapshot(doc(db, 'settings', 'squad'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.members) && data.members.length > 0) {
+          setSquad(data.members);
+        }
+      }
+    });
+    return () => unsubSquad();
+  }, []);
+
+  const updatePasswords = async (next: typeof passwords) => {
+    if (!isAdmin) return;
+    setPasswords(next);
+    await setDoc(doc(db, 'settings', 'passwords'), next);
+  };
+
+  const handleUpdateSquad = async (members: { name: string; fact: string }[]) => {
+    if (!isAdmin) return;
+    setSquad(members);
+    await setDoc(doc(db, 'settings', 'squad'), { members });
+  };
+
+  const updatePlayerPassword = async (playerName: string, newPass: string): Promise<string | null> => {
+    if (!newPass.trim()) return 'New password cannot be empty';
+    const next = { ...passwords, players: { ...passwords.players, [playerName]: newPass.trim() } };
+    setPasswords(next);
+    await setDoc(doc(db, 'settings', 'passwords'), next);
+    return null;
+  };
 
   const handleAddFaqItem = async (item: Omit<FaqItem, 'id'>) => {
     try {
@@ -501,25 +603,7 @@ export default function App() {
   };
 
   const handleLogin = (playerName: string) => {
-    const envKey = `VITE_PASS_${playerName.toUpperCase().replace(/\s+/g, '_')}`;
-    const metaEnv = (import.meta as any).env;
-    const correctPass = metaEnv ? metaEnv[envKey] : null;
-    
-    // Default fallback if no env var is set, using the fact-based pattern
-    const defaultPasswords: Record<string, string> = {
-      "Zephyr Y": "ATTITUDE26",
-      "Harry S": "CREATIVE26",
-      "Myles H": "SMILE26",
-      "Tanush P": "VISION26",
-      "Joshua M": "SPIRIT26",
-      "Thomas B": "FOCUS26",
-      "Benjamin C": "ENERGY26",
-      "Hugo D": "TOUCH26",
-      "Harvey M": "SPEED26",
-      "Julian B": "TEAMWORK26"
-    };
-    
-    const finalCorrectPass = correctPass || defaultPasswords[playerName] || 'EMJSC2026';
+    const finalCorrectPass = passwords.players[playerName] || 'EMJSC2026';
     
     if (playerLoginCode === finalCorrectPass) {
       localStorage.setItem('teamtrack_user', playerName);
@@ -642,7 +726,7 @@ export default function App() {
   };
 
   const handleAdminLogin = () => {
-    const correctPass = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
+    const correctPass = passwords.manager || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
     if (adminPass === correctPass) {
       setIsAdmin(true);
       localStorage.setItem('teamtrack_admin', 'true');
@@ -666,12 +750,12 @@ export default function App() {
 
     dutiesConfig.forEach(d => {
       dutyTypeCounts[d.id] = {};
-      TEAM_SQUAD.forEach(p => {
+      squad.forEach(p => {
         dutyTypeCounts[d.id][p.name] = 0;
       });
     });
 
-    TEAM_SQUAD.forEach(p => {
+    squad.forEach(p => {
       totalDutyCounts[p.name] = 0;
     });
 
@@ -709,7 +793,7 @@ export default function App() {
     });
 
     const getBalancedPlayer = (dutyId: string, excludedInThisGame: string[]) => {
-      const candidates = TEAM_SQUAD.filter(p => {
+      const candidates = squad.filter(p => {
         const name = p.name;
         const isExcluded = excludedInThisGame.includes(name);
         // COACH CHILD EXEMPTION LOGIC
@@ -1125,10 +1209,10 @@ export default function App() {
   const updateProfile = async (skills: string, photoUrl: string) => {
     if (!userName) return;
     try {
-      await setDoc(doc(db, 'profiles', userName), { 
-        skills, 
+      await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), {
+        skills,
         photoUrl,
-        updatedAt: serverTimestamp() 
+        updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -1145,12 +1229,29 @@ export default function App() {
 
   if (!userName) {
     return (
-      <div className="mobile-container flex flex-col items-center p-8 space-y-10 bg-white min-h-screen">
+      <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
+        <div className="absolute top-6 right-6 flex gap-2">
+          <button
+            onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Team Manager'); }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emjsc-navy text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
+          >
+            <Shield className="w-3.5 h-3.5 text-emjsc-red" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Manager</span>
+          </button>
+          <button
+            onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Coach'); }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Coach</span>
+          </button>
+        </div>
+
         <div className="flex flex-col items-center gap-6 mt-12 text-center">
-          <img 
-            src={CLUB_LOGO} 
-            alt="EMJSC Logo" 
-            className="w-32 drop-shadow-2xl" 
+          <img
+            src={CLUB_LOGO}
+            alt="EMJSC Logo"
+            className="w-32 drop-shadow-2xl"
             referrerPolicy="no-referrer"
           />
           <div className="space-y-2">
@@ -1160,50 +1261,25 @@ export default function App() {
             </p>
           </div>
         </div>
-        
-        {!targetPlayerProfile ? (
-          <>
-            <div className="w-full max-h-[50vh] overflow-y-auto px-2 space-y-3 custom-scrollbar">
-              {TEAM_SQUAD.map((player) => (
-                <button 
-                  key={player.name}
-                  onClick={() => setTargetPlayerProfile(player.name)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-emjsc-navy rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-emjsc-red group-hover:scale-110 transition-transform">
-                      {player.name.charAt(0)}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-black text-slate-800">{player.name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Active Player</p>
-                    </div>
-                  </div>
-                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emjsc-navy transition-colors" />
-                </button>
-              ))}
-            </div>
 
-            <div className="w-full pt-6 border-t border-slate-100 flex flex-col items-center gap-3">
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Coaches & Management</p>
-              <div className="w-full flex gap-2">
-                <button
-                  onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Team Manager'); }}
-                  className="flex-1 flex items-center justify-center gap-2 p-4 bg-emjsc-navy text-white rounded-2xl hover:shadow-xl transition-all active:scale-[0.98] shadow-lg shadow-blue-900/20"
-                >
-                  <Shield className="w-4 h-4 text-emjsc-red" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Manager</span>
-                </button>
-                <button
-                  onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole('Coach'); }}
-                  className="flex-1 flex items-center justify-center gap-2 p-4 bg-slate-700 text-white rounded-2xl hover:shadow-xl transition-all active:scale-[0.98] shadow-lg"
-                >
-                  <Zap className="w-4 h-4 text-amber-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Coach</span>
-                </button>
-              </div>
-            </div>
-          </>
+        {!targetPlayerProfile ? (
+          <div className="w-full px-2 space-y-1.5">
+            {squad.map((player) => (
+              <button
+                key={player.name}
+                onClick={() => setTargetPlayerProfile(player.name)}
+                className="w-full flex items-center justify-between py-2.5 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 bg-emjsc-navy rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-emjsc-red shrink-0">
+                    {player.name.charAt(0)}
+                  </div>
+                  <p className="text-sm font-black text-slate-800">{player.name}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0" />
+              </button>
+            ))}
+          </div>
         ) : (
           <div className="w-full space-y-4 max-w-sm">
             <div className="space-y-4">
@@ -1222,8 +1298,8 @@ export default function App() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (targetPlayerProfile === 'ADMIN') {
-                      const correctPass = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       const identity = targetAdminRole || 'Team Manager';
+                      const correctPass = (targetAdminRole === 'Coach' ? passwords.coach : passwords.manager) || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
                         localStorage.setItem('teamtrack_admin', 'true');
@@ -1231,7 +1307,7 @@ export default function App() {
                         setUserName(identity);
                         setPlayerLoginCode('');
                         setLoginError(null);
-                        setView('admin');
+                        setView('fixtures');
                       } else {
                         setLoginError(`Invalid password for ${identity}`);
                       }
@@ -1252,8 +1328,8 @@ export default function App() {
                 <button
                   onClick={() => {
                     if (targetPlayerProfile === 'ADMIN') {
-                      const correctPass = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       const identity = targetAdminRole || 'Team Manager';
+                      const correctPass = (targetAdminRole === 'Coach' ? passwords.coach : passwords.manager) || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
                         localStorage.setItem('teamtrack_admin', 'true');
@@ -1261,7 +1337,7 @@ export default function App() {
                         setUserName(identity);
                         setPlayerLoginCode('');
                         setLoginError(null);
-                        setView('admin');
+                        setView('fixtures');
                       } else {
                         setLoginError(`Invalid password for ${identity}`);
                       }
@@ -1333,7 +1409,6 @@ export default function App() {
           <nav className="flex flex-col gap-2">
             <DesktopNavButton active={view === 'fixtures' || view === 'game'} onClick={() => setView('fixtures')} icon={<Calendar className="w-5 h-5" />} label="Schedule" />
             <DesktopNavButton active={view === 'squad'} onClick={() => setView('squad')} icon={<Users className="w-5 h-5" />} label="Squad" />
-            <DesktopNavButton active={view === 'profile'} onClick={() => setView('profile')} icon={<UserIcon className="w-5 h-5" />} label="My Profile" />
             {messagingEnabled && (
               <DesktopNavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
             )}
@@ -1377,7 +1452,7 @@ export default function App() {
                 />
                 <div>
                   <h1 className="text-sm font-black tracking-tight text-emjsc-navy leading-none uppercase">
-                    {view === 'fixtures' ? 'Fixture' : view === 'squad' ? 'Squad' : view === 'admin' ? 'Admin' : view === 'profile' ? 'Profile' : view === 'messages' ? 'Messages' : 'Game'}
+                    {view === 'fixtures' ? 'Fixture' : view === 'squad' ? 'Squad' : view === 'admin' ? 'Admin' : view === 'messages' ? 'Messages' : 'Game'}
                   </h1>
                 </div>
               </div>
@@ -1403,7 +1478,6 @@ export default function App() {
                 >
                   <MobileNavItem active={view === 'fixtures' || view === 'game'} onClick={() => { setView('fixtures'); setMobileMenuOpen(false); }} icon={<Calendar className="w-5 h-5" />} label="Schedule" />
                   <MobileNavItem active={view === 'squad'} onClick={() => { setView('squad'); setMobileMenuOpen(false); }} icon={<Users className="w-5 h-5" />} label="Squad" />
-                  <MobileNavItem active={view === 'profile'} onClick={() => { setView('profile'); setMobileMenuOpen(false); }} icon={<UserIcon className="w-5 h-5" />} label="My Profile" />
                   {messagingEnabled && (
                     <MobileNavItem active={view === 'messages'} onClick={() => { setView('messages'); setMobileMenuOpen(false); }} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
                   )}
@@ -1639,7 +1713,7 @@ export default function App() {
                           <section className="space-y-4">
                             <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Next Match</h2>
                             <div
-                              onClick={isInProgress(game) ? undefined : () => { setSelectedGame(game); setView('game'); }}
+                              onClick={isInProgress(game) ? undefined : () => setSelectedGame(game)}
                               className={`bg-white border-2 border-emjsc-navy rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group transition-all duration-300 ${isInProgress(game) ? 'opacity-50 grayscale cursor-default' : 'cursor-pointer hover:border-emjsc-red'}`}
                             >
                               <div className="absolute top-0 right-0 bg-emjsc-navy text-white px-6 py-2 rounded-bl-3xl font-black uppercase tracking-tighter text-[9px] shadow-lg group-hover:bg-emjsc-red transition-colors flex items-center gap-2">
@@ -1845,7 +1919,7 @@ export default function App() {
                                       onToggleAvailability={isDimmed(game) ? undefined : handleToggleAvailability}
                                       isSyncing={isSyncing}
                                       dimmed={isDimmed(game)}
-                                      onClick={() => { setSelectedGame(game); setView('game'); }}
+                                      onClick={() => setSelectedGame(game)}
                                     />
                                   ))
                                 )}
@@ -1908,36 +1982,93 @@ export default function App() {
                       <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Team Squad • U8 White Saturday</h2>
                       <span className="text-[10px] font-bold text-white bg-emjsc-red px-2 py-1 rounded-full uppercase tracking-tighter shadow-sm">10 Players Squad</span>
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {TEAM_SQUAD.map((player) => (
-                        <div key={player.name} className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4 hover:shadow-md transition-shadow group overflow-hidden">
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={playerAvatar(player.name)}
-                              alt={player.name}
-                              className="w-16 h-16 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform"
-                            />
-                            <div>
-                              <p className="text-xl font-black text-slate-800 tracking-tighter uppercase">{player.name}</p>
-                              <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight text-emjsc-navy opacity-60 italic leading-none mt-1">EMJSC • U8 White Saturday</p>
-                            </div>
-                          </div>
-                          
-                          <div className="pt-4 border-t border-slate-50 space-y-3">
-                            <div className="flex items-start gap-2">
-                              <Shield className="w-4 h-4 text-emjsc-red mt-0.5 shrink-0" />
-                              <span className="text-xs font-bold italic text-slate-600 leading-relaxed uppercase">"{player.fact}"</span>
-                            </div>
-                            {profiles[player.name]?.skills && (
-                              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Coach's Scouting Report:</p>
-                                <p className="text-[10px] font-bold text-slate-600 leading-normal">{profiles[player.name]?.skills}</p>
-                              </div>
-                            )}
-                          </div>
+
+                    <div className="bg-emjsc-navy rounded-3xl p-6 flex items-center gap-5 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden">
+                      <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-3xl select-none">🎽</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xl font-black text-white tracking-tighter uppercase">Coach</p>
+                          <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">Coach</span>
                         </div>
-                      ))}
+                        <p className="text-[10px] text-white/60 uppercase font-black tracking-tight italic leading-none mb-2">EMJSC • U8 White Saturday</p>
+                        <p className="text-[10px] font-bold text-white/80 leading-relaxed">
+                          Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.
+                        </p>
+                      </div>
+                      <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {squad.map((player) => {
+                        const isMe = player.name === userName;
+                        const isEditing = isMe && editingSkills !== null;
+                        return (
+                          <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow group overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={playerAvatar(player.name)}
+                                alt={player.name}
+                                className="w-16 h-16 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xl font-black text-slate-800 tracking-tighter uppercase truncate">{player.name}</p>
+                                  {isMe && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0">You</span>}
+                                </div>
+                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight opacity-60 italic leading-none mt-1">EMJSC • U8 White Saturday</p>
+                              </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-50 space-y-3">
+                              {isEditing ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    autoFocus
+                                    value={editingSkills}
+                                    onChange={(e) => setEditingSkills(e.target.value)}
+                                    placeholder="Describe your skills, favourite position, or what you're working on..."
+                                    className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-emjsc-navy outline-none resize-none placeholder:text-slate-300"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => setEditingSkills(null)}
+                                      className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all"
+                                    >Cancel</button>
+                                    <button
+                                      onClick={async () => { await updateProfile(editingSkills, playerAvatar(userName || '')); setEditingSkills(null); }}
+                                      className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all"
+                                    >Save</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex items-start gap-2">
+                                    <Shield className="w-4 h-4 text-emjsc-red mt-0.5 shrink-0" />
+                                    <span className="text-xs font-bold italic text-slate-600 leading-relaxed uppercase">
+                                      "{profiles[player.name.replace(/\s+/g, '_')]?.skills || player.fact}"
+                                    </span>
+                                  </div>
+                                  {isMe && (
+                                    <button
+                                      onClick={() => setEditingSkills(profiles[player.name.replace(/\s+/g, '_')]?.skills || '')}
+                                      className="text-[9px] font-black uppercase tracking-widest text-emjsc-navy border border-emjsc-navy/20 px-3 py-1.5 rounded-lg hover:bg-emjsc-navy hover:text-white transition-all active:scale-95"
+                                    >
+                                      {profiles[player.name.replace(/\s+/g, '_')]?.skills ? 'Edit Description' : 'Add Description'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {isMe && (
+                                <ChangePasswordForm
+                                  playerName={player.name}
+                                  onSave={(next) => updatePlayerPassword(player.name, next)}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                     
                     <div className="p-6 bg-slate-100 border border-slate-200 rounded-3xl flex items-start gap-4">
@@ -1961,22 +2092,10 @@ export default function App() {
                       feedbacks={feedbacks}
                       availabilities={availabilities}
                       onToggleAvailability={handleToggleAvailability}
-                      onBack={() => setView('fixtures')} 
+                      onBack={() => setSelectedGame(null)}
                       onSignUp={handleSignUp}
                       onRequestSwap={handleRequestSwap}
                       isSyncing={isSyncing}
-                    />
-                  </div>
-                )}
-
-                {view === 'profile' && (
-                  <div className="max-w-2xl mx-auto">
-                    <ProfileView 
-                      userName={userName || ''} 
-                      profiles={profiles} 
-                      feedbacks={feedbacks}
-                      games={games}
-                      onUpdateProfile={updateProfile} 
                     />
                   </div>
                 )}
@@ -1987,7 +2106,7 @@ export default function App() {
                       userName={userName || ''} 
                       messages={messages} 
                       blocks={blocks} 
-                      teamSquad={TEAM_SQUAD}
+                      teamSquad={squad}
                       isAdmin={isAdmin}
                       onSendMessage={handleSendMessage} 
                       onBlockUser={handleBlockUser} 
@@ -1999,8 +2118,9 @@ export default function App() {
 
                 {view === 'admin' && (
                   <div className="max-w-4xl mx-auto">
-                        <AdminView 
-                          games={games} 
+                        <AdminView
+                          userName={userName}
+                          games={games}
                           feedbacks={feedbacks}
                           messages={messages}
                           blocks={blocks}
@@ -2048,6 +2168,10 @@ export default function App() {
                           onUpdateFaqItem={handleUpdateFaqItem}
                           onDeleteFaqItem={handleDeleteFaqItem}
                           onResetFaq={handleResetFaq}
+                          passwords={passwords}
+                          onUpdatePasswords={updatePasswords}
+                          squad={squad}
+                          onUpdateSquad={handleUpdateSquad}
                         />
                   </div>
                 )}
