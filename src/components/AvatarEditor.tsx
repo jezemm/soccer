@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Shuffle, Check, RefreshCw } from 'lucide-react';
 import { AvatarConfig, AVATAR_OPTIONS, getAvataaarsUrl, getDefaultAvatarConfig } from '../lib/constants';
+import { AvatarImage } from './AvatarImage';
 
 const LABELS: Record<keyof AvatarConfig, string> = {
   topType: 'Hair / Hat',
@@ -23,6 +24,7 @@ const DISPLAYED_KEYS: (keyof AvatarConfig)[] = [
 ];
 
 function formatLabel(val: string): string {
+  if (val === 'EMJSCJersey') return '⚽ EMJSC Jersey';
   return val.replace(/([A-Z0-9])/g, ' $1').replace(/^\s/, '').trim();
 }
 
@@ -70,21 +72,20 @@ export function AvatarEditor({ initialConfig, onSave, onCancel }: AvatarEditorPr
 
   const showFacialHairColor = config.facialHairType !== 'Blank';
   const showGraphic = config.clotheType === 'GraphicShirt';
+  const isJersey = config.clotheType === 'EMJSCJersey';
   const visibleKeys = DISPLAYED_KEYS.filter(k => {
     if (k === 'facialHairColor' && !showFacialHairColor) return false;
     if (k === 'graphicType' && !showGraphic) return false;
+    if (k === 'clotheColor' && isJersey) return false;
     return true;
   });
-
-  const avatarUrl = getAvataaarsUrl(config);
 
   return (
     <div className="space-y-6">
       {/* Preview */}
       <div className="flex justify-center">
-        <img
-          src={avatarUrl}
-          alt="Your avatar"
+        <AvatarImage
+          config={config}
           className="w-32 h-32 rounded-[2rem] shadow-xl"
         />
       </div>

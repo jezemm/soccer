@@ -49,6 +49,7 @@ import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, A
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
 import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig } from './lib/constants';
 import { AvatarEditor } from './components/AvatarEditor';
+import { AvatarImage } from './components/AvatarImage';
 import { TermsModal, DocModal } from './components/TermsModal';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
@@ -1668,11 +1669,12 @@ export default function App() {
               </div>
             </button>
             <div className="bg-slate-50 p-3 rounded-xl flex items-center gap-3">
-              <img
-                src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(userName || ''))}
+              <AvatarImage
+                config={profiles[(userName || '').replace(/\s+/g, '_')]?.avatarConfig}
+                photoUrl={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl}
+                fallbackName={userName || ''}
                 alt="Avatar"
                 className="w-8 h-8 rounded-full"
-                referrerPolicy="no-referrer"
               />
               <div className="overflow-hidden">
                 <p className="text-[10px] font-black text-slate-800 truncate">{userName}</p>
@@ -1747,11 +1749,12 @@ export default function App() {
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
-                      <img
-                        src={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(userName || ''))}
+                      <AvatarImage
+                        config={profiles[(userName || '').replace(/\s+/g, '_')]?.avatarConfig}
+                        photoUrl={profiles[(userName || '').replace(/\s+/g, '_')]?.photoUrl}
+                        fallbackName={userName || ''}
                         alt="Avatar"
                         className="w-8 h-8 rounded-full border border-emjsc-red bg-white"
-                        referrerPolicy="no-referrer"
                       />
                       <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{userName}</span>
                     </div>
@@ -2226,7 +2229,8 @@ export default function App() {
                     {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => {
                       const isMe = isAdmin && userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
-                      const photoUrl = profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name));
+                      const staffPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
+                      const staffAvatarConfig = profiles[profileKey]?.avatarConfig;
                       const bio = profiles[profileKey]?.skills || account.tagline || 'Runs Wednesday training sessions and leads the team on Saturdays. Building skills, confidence, and a love of the game — one match at a time.';
                       const isEditingBio = isMe && editingSkills !== null;
                       const isEditingAv = isMe && editingAvatar;
@@ -2234,7 +2238,7 @@ export default function App() {
                         <div key={account.id} className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
                           <div className="flex items-center gap-4">
                             <div className="relative shrink-0">
-                              <img src={photoUrl} alt={account.name} className="w-16 h-16 rounded-2xl" />
+                              <AvatarImage config={staffAvatarConfig} photoUrl={staffPhotoUrl} fallbackName={account.name} alt={account.name} className="w-16 h-16 rounded-2xl" />
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
@@ -2271,7 +2275,7 @@ export default function App() {
                               />
                               <div className="flex gap-2">
                                 <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white/10 text-white/70 rounded-xl active:scale-95 transition-all">Cancel</button>
-                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || photoUrl, profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
                               </div>
                             </div>
                           ) : (
@@ -2301,13 +2305,15 @@ export default function App() {
                         const isEditingAvatarForMe = isMe && editingAvatar;
                         const playerProfileKey = player.name.replace(/\s+/g, '_');
                         const savedPhotoUrl = profiles[playerProfileKey]?.photoUrl;
-                        const playerPhotoUrl = savedPhotoUrl || getAvataaarsUrl(getDefaultAvatarConfig(player.name));
+                        const playerAvatarConfig = profiles[playerProfileKey]?.avatarConfig;
                         return (
                           <div key={player.name} className={`bg-white rounded-3xl shadow-sm border p-6 space-y-4 hover:shadow-md transition-shadow overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                             <div className="flex items-center gap-4">
                               <div className="relative shrink-0">
-                                <img
-                                  src={playerPhotoUrl}
+                                <AvatarImage
+                                  config={playerAvatarConfig}
+                                  photoUrl={savedPhotoUrl}
+                                  fallbackName={player.name}
                                   alt={player.name}
                                   className="w-16 h-16 rounded-2xl"
                                 />
@@ -2393,7 +2399,8 @@ export default function App() {
                     {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => {
                       const isMe = isAdmin && userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
-                      const photoUrl = profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name));
+                      const mgrPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
+                      const mgrAvatarConfig = profiles[profileKey]?.avatarConfig;
                       const bio = profiles[profileKey]?.skills || account.tagline || 'Manages the team hub, coordinates duties and fixtures, and is the first point of contact for any team queries.';
                       const isEditingBio = isMe && editingSkills !== null;
                       const isEditingAv = isMe && editingAvatar;
@@ -2401,7 +2408,7 @@ export default function App() {
                         <div key={account.id} className={`bg-white rounded-3xl p-6 shadow-sm border space-y-4 overflow-hidden ${isMe ? 'border-emjsc-red/30 ring-1 ring-emjsc-red/10' : 'border-slate-200'}`}>
                           <div className="flex items-center gap-4">
                             <div className="relative shrink-0">
-                              <img src={photoUrl} alt={account.name} className="w-16 h-16 rounded-2xl" />
+                              <AvatarImage config={mgrAvatarConfig} photoUrl={mgrPhotoUrl} fallbackName={account.name} alt={account.name} className="w-16 h-16 rounded-2xl" />
                               {isMe && !isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
@@ -2436,7 +2443,7 @@ export default function App() {
                               />
                               <div className="flex gap-2">
                                 <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all">Cancel</button>
-                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || photoUrl, profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all">Save</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(account.name)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all">Save</button>
                               </div>
                             </div>
                           ) : (

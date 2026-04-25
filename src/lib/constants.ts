@@ -307,7 +307,7 @@ export const AVATAR_OPTIONS = {
   hairColor: ['Black','Brown','BrownDark','Auburn','Blonde','BlondeGolden','Red','SilverGray','Platinum','PastelPink'],
   facialHairType: ['Blank','BeardLight','BeardMedium','BeardMajestic','MoustacheFancy','MoustacheMagnum'],
   facialHairColor: ['Brown','BrownDark','Auburn','Black','Blonde','BlondeGolden','Red','Platinum'],
-  clotheType: ['Hoodie','BlazerShirt','BlazerSweater','ShirtCrewNeck','ShirtScoopNeck','ShirtVNeck','CollarSweater','Overall','GraphicShirt'],
+  clotheType: ['EMJSCJersey','Hoodie','BlazerShirt','BlazerSweater','ShirtCrewNeck','ShirtScoopNeck','ShirtVNeck','CollarSweater','Overall','GraphicShirt'],
   clotheColor: ['Red','Blue01','Blue02','Blue03','Black','White','Heather','Gray01','Gray02','PastelBlue','PastelGreen','PastelOrange','PastelYellow','Pink'],
   graphicType: ['Bat','Cumbia','Deer','Diamond','Hola','Pizza','Resist','Selena','Bear','SkullOutline','Skull'],
   eyeType: ['Default','Happy','Side','Squint','Surprised','Wink','Close','Dizzy','EyeRoll','Hearts','WinkWacky'],
@@ -317,7 +317,12 @@ export const AVATAR_OPTIONS = {
 };
 
 export function getAvataaarsUrl(config: Partial<AvatarConfig>): string {
-  const params = new URLSearchParams({ avatarStyle: 'Circle', ...config } as Record<string, string>);
+  const mapped = { ...config };
+  if (mapped.clotheType === 'EMJSCJersey') {
+    mapped.clotheType = 'ShirtCrewNeck';
+    mapped.clotheColor = 'White';
+  }
+  const params = new URLSearchParams({ avatarStyle: 'Circle', ...mapped } as Record<string, string>);
   return `https://avataaars.io/?${params.toString()}`;
 }
 
