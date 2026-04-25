@@ -1250,17 +1250,14 @@ export default function App() {
   if (!userName) {
     return (
       <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
-        <div className="absolute top-6 right-6 flex gap-2">
-          {staffAccounts.map(account => (
-            <button
-              key={account.id}
-              onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(account.id); }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md ${account.role === 'manager' ? 'bg-emjsc-navy shadow-blue-900/20' : 'bg-slate-700'}`}
-            >
-              {account.role === 'manager' ? <Shield className="w-3.5 h-3.5 text-emjsc-red" /> : <Zap className="w-3.5 h-3.5 text-amber-400" />}
-              <span className="text-[9px] font-black uppercase tracking-widest">{account.name}</span>
-            </button>
-          ))}
+        <div className="absolute top-6 right-6">
+          <button
+            onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-white bg-emjsc-navy rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
+          >
+            <Shield className="w-3.5 h-3.5 text-emjsc-red" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Admin</span>
+          </button>
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-12 text-center">
@@ -1273,7 +1270,7 @@ export default function App() {
           <div className="space-y-2">
             <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
             <p className="text-slate-500 text-sm font-bold italic">
-              {targetPlayerProfile === 'ADMIN' ? `Sign in as ${targetAdminRole || 'Admin'}` : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
+              {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
           </div>
         </div>
@@ -1305,37 +1302,50 @@ export default function App() {
                   {loginError}
                 </div>
               )}
+              {targetPlayerProfile === 'ADMIN' && (
+                <select
+                  value={targetAdminRole || ''}
+                  onChange={(e) => { setTargetAdminRole(e.target.value || null); setPlayerLoginCode(''); setLoginError(null); }}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emjsc-navy outline-none font-bold text-center text-sm text-emjsc-navy"
+                >
+                  <option value="">Select user...</option>
+                  {staffAccounts.map(account => (
+                    <option key={account.id} value={account.id}>{account.name}</option>
+                  ))}
+                </select>
+              )}
               <input
                 type="password"
-                placeholder={targetPlayerProfile === 'ADMIN' ? `Password for ${staffAccounts.find(a => a.id === targetAdminRole)?.name || 'Admin'}` : "Enter Player Password"}
+                placeholder={targetPlayerProfile === 'ADMIN' ? (targetAdminRole ? `Password for ${staffAccounts.find(a => a.id === targetAdminRole)?.name}` : 'Select a user first') : "Enter Player Password"}
                 value={playerLoginCode}
                 onChange={(e) => setPlayerLoginCode(e.target.value)}
-                autoFocus
+                disabled={targetPlayerProfile === 'ADMIN' && !targetAdminRole}
+                autoFocus={targetPlayerProfile !== 'ADMIN'}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (targetPlayerProfile === 'ADMIN') {
                       const account = staffAccounts.find(a => a.id === targetAdminRole);
-                      const identity = account?.name || 'Admin';
-                      const correctPass = account?.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
+                      if (!account) return;
+                      const correctPass = account.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
-                        setUserRole(account?.role || 'manager');
+                        setUserRole(account.role || 'manager');
                         localStorage.setItem('teamtrack_admin', 'true');
-                        localStorage.setItem('teamtrack_role', account?.role || 'manager');
-                        localStorage.setItem('teamtrack_user', identity);
-                        setUserName(identity);
+                        localStorage.setItem('teamtrack_role', account.role || 'manager');
+                        localStorage.setItem('teamtrack_user', account.name);
+                        setUserName(account.name);
                         setPlayerLoginCode('');
                         setLoginError(null);
                         setView('fixtures');
                       } else {
-                        setLoginError(`Invalid password for ${identity}`);
+                        setLoginError(`Invalid password for ${account.name}`);
                       }
                     } else {
                       handleLogin(targetPlayerProfile);
                     }
                   }
                 }}
-                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emjsc-navy outline-none font-bold text-center text-lg"
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emjsc-navy outline-none font-bold text-center text-lg disabled:opacity-40"
               />
               <div className="flex gap-2">
                 <button
@@ -1348,28 +1358,29 @@ export default function App() {
                   onClick={() => {
                     if (targetPlayerProfile === 'ADMIN') {
                       const account = staffAccounts.find(a => a.id === targetAdminRole);
-                      const identity = account?.name || 'Admin';
-                      const correctPass = account?.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
+                      if (!account) return;
+                      const correctPass = account.password || (import.meta as any).env.VITE_ADMIN_PASSWORD || 'admin123';
                       if (playerLoginCode === correctPass) {
                         setIsAdmin(true);
-                        setUserRole(account?.role || 'manager');
+                        setUserRole(account.role || 'manager');
                         localStorage.setItem('teamtrack_admin', 'true');
-                        localStorage.setItem('teamtrack_role', account?.role || 'manager');
-                        localStorage.setItem('teamtrack_user', identity);
-                        setUserName(identity);
+                        localStorage.setItem('teamtrack_role', account.role || 'manager');
+                        localStorage.setItem('teamtrack_user', account.name);
+                        setUserName(account.name);
                         setPlayerLoginCode('');
                         setLoginError(null);
                         setView('fixtures');
                       } else {
-                        setLoginError(`Invalid password for ${identity}`);
+                        setLoginError(`Invalid password for ${account.name}`);
                       }
                     } else {
                       handleLogin(targetPlayerProfile);
                     }
                   }}
-                  className="flex-[2] bg-emjsc-navy text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform"
+                  disabled={targetPlayerProfile === 'ADMIN' && !targetAdminRole}
+                  className="flex-[2] bg-emjsc-navy text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform disabled:opacity-40"
                 >
-                  {targetPlayerProfile === 'ADMIN' ? `Sign in as ${targetAdminRole || 'Admin'}` : 'Confirm Password'}
+                  {targetPlayerProfile === 'ADMIN' ? 'Sign In' : 'Confirm Password'}
                 </button>
               </div>
             </div>
