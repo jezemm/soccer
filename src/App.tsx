@@ -2021,11 +2021,11 @@ export default function App() {
                         const anyFilterActive = statusFilter !== 'all' || venueFilter !== 'all' || dutyFilter;
                         return (
                           <>
-                            <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+                            <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
                               <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
                                 {(['all', 'upcoming', 'completed'] as const).map(s => (
                                   <button key={s} onClick={() => setStatusFilter(s)}
-                                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
                                     {s === 'all' ? 'All' : s === 'upcoming' ? 'Next' : 'Done'}
                                   </button>
                                 ))}
@@ -2033,16 +2033,18 @@ export default function App() {
                               <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
                                 {(['all', 'home', 'away'] as const).map(v => (
                                   <button key={v} onClick={() => setVenueFilter(v)}
-                                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
                                     {v === 'all' ? 'All' : v}
                                   </button>
                                 ))}
                               </div>
                               {userName && (
-                                <button onClick={() => setDutyFilter(f => !f)}
-                                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-colors shrink-0 whitespace-nowrap ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
-                                  On Duty
-                                </button>
+                                <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
+                                  <button onClick={() => setDutyFilter(f => !f)}
+                                    className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${dutyFilter ? 'bg-emjsc-red text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    Duty
+                                  </button>
+                                </div>
                               )}
                             </div>
                             <section className="space-y-4">
