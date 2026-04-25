@@ -262,18 +262,21 @@ exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", c
         res.status(200).json({ cafes: [], cached: false });
         return;
     }
+    const bust = req.query.bust === 'true';
     const db = (0, firestore_1.getFirestore)(DATABASE_ID);
     const cacheKey = venueCacheKey(venue);
     const cacheRef = db.collection("cafeCache").doc(cacheKey);
     try {
-        // 1. Check Firestore cache
-        const cached = await cacheRef.get();
-        if (cached.exists) {
-            const data = cached.data();
-            const age = Date.now() - ((_c = (_b = (_a = data.fetchedAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) !== null && _c !== void 0 ? _c : 0);
-            if (age < CAFE_CACHE_TTL_MS) {
-                res.status(200).json({ cafes: (_d = data.cafes) !== null && _d !== void 0 ? _d : [], cached: true });
-                return;
+        // 1. Check Firestore cache (skipped when bust=true)
+        if (!bust) {
+            const cached = await cacheRef.get();
+            if (cached.exists) {
+                const data = cached.data();
+                const age = Date.now() - ((_c = (_b = (_a = data.fetchedAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) !== null && _c !== void 0 ? _c : 0);
+                if (age < CAFE_CACHE_TTL_MS) {
+                    res.status(200).json({ cafes: (_d = data.cafes) !== null && _d !== void 0 ? _d : [], cached: true });
+                    return;
+                }
             }
         }
         // 2. Geocode venue → lat/lng

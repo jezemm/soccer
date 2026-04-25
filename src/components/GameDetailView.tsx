@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car, Flag, User } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
@@ -72,24 +72,33 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const venueName = getVenueName(gameLocation);
 
   const [cafesStatus, setCafesStatus] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    () => venueName ? 'loading' : 'idle'
+    () => gameLocation ? 'loading' : 'idle'
   );
 
-  const fetchCafes = useCallback(() => {
-    if (!venueName) return;
+  const lastFetchLocationRef = useRef<string>('');
+
+  const fetchCafes = useCallback((bust?: boolean) => {
+    if (!gameLocation) return;
     setCafesStatus('loading');
     setCafes([]);
-    fetch(`${FUNCTIONS_BASE}/cafesNearby?venue=${encodeURIComponent(venueName + ' Melbourne VIC')}`)
+    const url = `${FUNCTIONS_BASE}/cafesNearby?venue=${encodeURIComponent(gameLocation)}${bust ? '&bust=true' : ''}`;
+    fetch(url)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => {
         const result: NearbyCafe[] = Array.isArray(data.cafes) ? data.cafes : [];
         setCafes(result);
         setCafesStatus('done');
+        lastFetchLocationRef.current = gameLocation;
       })
       .catch(() => setCafesStatus('error'));
-  }, [venueName]);
+  }, [venueName, gameLocation]);
 
   useEffect(() => { fetchCafes(); }, [fetchCafes]);
+
+  const handleRefreshCafes = () => {
+    const locationChanged = lastFetchLocationRef.current !== '' && gameLocation !== lastFetchLocationRef.current;
+    fetchCafes(locationChanged);
+  };
 
   const displayCafes = sortCafes(cafes, cafeSort, 3);
 
@@ -334,7 +343,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 </div>
               )}
               {cafesStatus !== 'loading' && (
-                <button onClick={fetchCafes} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Refresh">
+                <button onClick={handleRefreshCafes} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Refresh">
                   <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
                 </button>
               )}
@@ -383,7 +392,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                     </div>
                   </div>
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(venueName + ' Melbourne VIC')}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(gameLocation)}&waypoints=${encodeURIComponent(cafe.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`flex items-center justify-center gap-2 w-full text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all active:scale-[0.98] ${i === 0 ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-900/20' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}
@@ -401,7 +410,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
               <p className="text-[10px] text-slate-500 font-medium">No rated cafes found nearby — try Google Maps directly.</p>
               <a
-                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(venueName + ' Melbourne VIC')}`}
+                href={`https://www.google.com/maps/search/cafe+near+${encodeURIComponent(gameLocation)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
               >
@@ -414,7 +423,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
           {cafesStatus === 'error' && (
             <div className="rounded-2xl border border-red-100 bg-red-50 p-4 space-y-3">
               <p className="text-[10px] text-red-600 font-bold">Couldn't load cafes — tap to try again.</p>
-              <button onClick={fetchCafes} className="flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all">
+              <button onClick={handleRefreshCafes} className="flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all">
                 <RefreshCw className="w-3.5 h-3.5" />Retry
               </button>
             </div>

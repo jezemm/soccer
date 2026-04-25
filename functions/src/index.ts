@@ -311,19 +311,22 @@ export const cafesNearby = onRequest(
       return;
     }
 
+    const bust = req.query.bust === 'true';
     const db = getFirestore(DATABASE_ID);
     const cacheKey = venueCacheKey(venue);
     const cacheRef = db.collection("cafeCache").doc(cacheKey);
 
     try {
-      // 1. Check Firestore cache
-      const cached = await cacheRef.get();
-      if (cached.exists) {
-        const data = cached.data()!;
-        const age = Date.now() - (data.fetchedAt?.toMillis?.() ?? 0);
-        if (age < CAFE_CACHE_TTL_MS) {
-          res.status(200).json({ cafes: data.cafes ?? [], cached: true });
-          return;
+      // 1. Check Firestore cache (skipped when bust=true)
+      if (!bust) {
+        const cached = await cacheRef.get();
+        if (cached.exists) {
+          const data = cached.data()!;
+          const age = Date.now() - (data.fetchedAt?.toMillis?.() ?? 0);
+          if (age < CAFE_CACHE_TTL_MS) {
+            res.status(200).json({ cafes: data.cafes ?? [], cached: true });
+            return;
+          }
         }
       }
 
