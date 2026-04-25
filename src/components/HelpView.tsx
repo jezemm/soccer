@@ -16,13 +16,11 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
     (items as any[]).length > 0 ? items : SEED_FAQS
   );
 
-  const [syncedFromFirestore, setSyncedFromFirestore] = useState(false);
   React.useEffect(() => {
-    if ((items as any[]).length > 0 && !syncedFromFirestore) {
+    if ((items as any[]).length > 0) {
       setLocalItems(items);
-      setSyncedFromFirestore(true);
     }
-  }, [items, syncedFromFirestore]);
+  }, [items]);
 
   const startEdit = (item: any) => { setEditingId(item.id); setEditQ(item.question); setEditA(item.answer); };
   const cancelEdit = () => setEditingId(null);

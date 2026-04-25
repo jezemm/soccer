@@ -657,16 +657,16 @@ export default function App() {
     const assignments = game.assignments || {};
     const swapRequests = game.swapRequests || {};
     
-    // Fallback for legacy fields if matches dutyId exactly
-    const legacyValue = (dutyId === 'goalie' ? game.goalie : 
-                        dutyId === 'snack_provider' ? game.snackProvider : 
-                        dutyId === 'pitch_marshal' ? game.pitchMarshal : 
-                        dutyId === 'referee' ? game.referee : null) || assignments[dutyId];
-    
-    const legacySwap = (dutyId === 'goalie' ? game.goalieSwapRequested : 
-                       dutyId === 'snack_provider' ? game.snackSwapRequested : 
-                       dutyId === 'pitch_marshal' ? game.marshalSwapRequested : 
-                       dutyId === 'referee' ? game.refereeSwapRequested : null) || swapRequests[dutyId];
+    // assignments map takes priority over legacy fields
+    const legacyValue = assignments[dutyId] || (dutyId === 'goalie' ? game.goalie :
+                        dutyId === 'snack_provider' ? game.snackProvider :
+                        dutyId === 'pitch_marshal' ? game.pitchMarshal :
+                        dutyId === 'referee' ? game.referee : null);
+
+    const legacySwap = swapRequests[dutyId] || (dutyId === 'goalie' ? game.goalieSwapRequested :
+                       dutyId === 'snack_provider' ? game.snackSwapRequested :
+                       dutyId === 'pitch_marshal' ? game.marshalSwapRequested :
+                       dutyId === 'referee' ? game.refereeSwapRequested : null);
 
     try {
       let updates: any = {
@@ -1765,7 +1765,7 @@ export default function App() {
                                     )}
                                   </div>
                                   <div className="space-y-1">
-                                    {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {team}</h3>{club && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{club}</p>}</>; })()}
+                                    {(() => { const { club, team } = splitOpponent(game.opponent); return <>{club && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{club}</p>}<h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {team}</h3></>; })()}
                                     <a
                                       href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
                                       target="_blank"

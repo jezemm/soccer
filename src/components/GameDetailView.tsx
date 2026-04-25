@@ -105,7 +105,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             </button>
           </div>
           <div className="mb-4">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {team}</h3>{club && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{club}</p>}</>; })()}
+            {(() => { const { club, team } = splitOpponent(game.opponent); return <>{club && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{club}</p>}<h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {team}</h3></>; })()}
           </div>
           <div className="space-y-2">
             <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
