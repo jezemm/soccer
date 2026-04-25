@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { db, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
-import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl } from './lib/constants';
+import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay } from './lib/constants';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { GameCard } from './components/GameCard';
@@ -1251,6 +1251,13 @@ export default function App() {
           kickOff,
         };
 
+        // Logos and map URL from Playwright scrape
+        const opponentLogo = isHome ? (attrs.away_team_logo ?? null) : (attrs.home_team_logo ?? null);
+        const homeTeamLogo = isHome ? (attrs.home_team_logo ?? null) : (attrs.away_team_logo ?? null);
+        if (opponentLogo) gameData.opponentLogo = opponentLogo;
+        if (homeTeamLogo) gameData.homeTeamLogo = homeTeamLogo;
+        if (attrs.map_url) gameData.mapUrlOverride = attrs.map_url;
+
         try {
           await setDoc(doc(db, 'games', gameId), gameData, { merge: true });
           syncedCount++;
@@ -1276,6 +1283,31 @@ export default function App() {
     }
   };
 
+
+  const scrapeDriblAndSync = async () => {
+    if (!isAdmin) return;
+    setAdminActionStatus('Launching browser scraper…');
+    try {
+      const res = await fetch('/api/scrape-dribl');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const { fixtures, debug } = await res.json();
+      console.log('[scrape-dribl] debug:', debug);
+      if (!fixtures || fixtures.length === 0) {
+        setAdminActionStatus('Scrape returned no fixtures — check browser console for debug info');
+        setTimeout(() => setAdminActionStatus(null), 8000);
+        return;
+      }
+      setAdminActionStatus(`Scraped ${fixtures.length} fixture(s) — writing to database…`);
+      await bulkSyncFixtures({ data: fixtures });
+    } catch (err: any) {
+      console.error("Scrape error:", err);
+      setAdminActionStatus(`Scrape failed: ${err?.message || 'unknown error'}`);
+      setTimeout(() => setAdminActionStatus(null), 8000);
+    }
+  };
 
   const refreshTravelTimes = async () => {
     if (!isAdmin || !homeGround) return;
@@ -1972,7 +2004,7 @@ export default function App() {
                                       className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-tighter hover:text-emjsc-red transition-colors w-fit group/loc"
                                     >
                                       <MapPin className="w-3.5 h-3.5 text-emjsc-red" />
-                                      <span className="line-clamp-1">{game.location}</span>
+                                      <span className="line-clamp-1">{formatVenueDisplay(game.location)}</span>
                                     </a>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleToggleAvailability(userName, dateKey); }}
@@ -2448,6 +2480,7 @@ export default function App() {
                           onUpdateHomeGround={updateHomeGround}
                           onRefreshTravelTimes={refreshTravelTimes}
                           onBulkSync={bulkSyncFixtures}
+                          onScrapeDribl={scrapeDriblAndSync}
                           coachChild={coachChild}
                           onUpdateCoachChild={updateCoachChild}
                           coachExemptDuties={coachExemptDuties}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ArrowLeftRight, Zap, Users } from 'lucide-react';
-import { splitOpponent, getGameMapUrl } from '../lib/constants';
+import { splitOpponent, getGameMapUrl, formatVenueDisplay } from '../lib/constants';
 
 export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
   const date = new Date(game.date);
@@ -71,7 +71,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             className="flex items-center gap-1 group/loc w-fit"
           >
             <MapPin className="w-3 h-3 text-emjsc-red shrink-0" />
-            <p className="text-[9px] text-slate-500 font-bold uppercase truncate tracking-tight group-hover/loc:text-emjsc-red transition-colors">{game.location}</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase truncate tracking-tight group-hover/loc:text-emjsc-red transition-colors">{formatVenueDisplay(game.location)}</p>
           </a>
           {onToggleAvailability && (
             <button
@@ -88,6 +88,14 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           )}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
+          {game.opponentLogo && (
+            <img
+              src={game.opponentLogo}
+              alt={game.opponent}
+              className="w-10 h-10 object-contain rounded-lg"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
           <div className="flex flex-col items-end gap-0">
             <p className="text-[9px] text-emjsc-navy font-black leading-none uppercase tracking-tighter">ARRIVE {arrivalTime}</p>
             <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">KO {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>

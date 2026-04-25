@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation } from 'lucide-react';
-import { splitOpponent, getCafesForLocation, getGameMapUrl, getVenueName } from '../lib/constants';
+import { splitOpponent, getCafesForLocation, getGameMapUrl, getVenueName, formatVenueDisplay } from '../lib/constants';
 import type { NearbyCafe } from '../lib/constants';
 
 function DutyRow({ label, assignedTo, onSignUp, isMe, swapRequested, onRequestSwap, isSyncing }: any) {
@@ -110,8 +110,18 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
               </span>
             </button>
           </div>
-          <div className="mb-4">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{team}</p>}</>; })()}
+          <div className="mb-4 flex items-center gap-4">
+            {game.opponentLogo && (
+              <img
+                src={game.opponentLogo}
+                alt={game.opponent}
+                className="w-16 h-16 object-contain rounded-2xl shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
+            <div>
+              {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{team}</p>}</>; })()}
+            </div>
           </div>
           <div className="space-y-2">
             <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
@@ -126,7 +136,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 rel="noopener noreferrer"
                 className="hover:underline"
               >
-                {game.location}
+                {formatVenueDisplay(game.location)}
               </a>
             </p>
           </div>
@@ -240,7 +250,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-amber-900/20"
               >
                 <Coffee className="w-3.5 h-3.5" />
-                Find Cafes Near {game.location.split(',')[0]}
+                Find Cafes Near {getVenueName(game.location)}
               </a>
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getVenueName(game.location) + ' Melbourne VIC')}&travelmode=driving`}

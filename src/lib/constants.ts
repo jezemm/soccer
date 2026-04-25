@@ -213,6 +213,12 @@ export function getVenueName(location: string): string {
   return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, '').trim() || location;
 }
 
+export function formatVenueDisplay(location: string): string {
+  const venue = getVenueName(location);
+  const pitch = location.slice(venue.length).trim();
+  return pitch ? `${venue} - ${pitch}` : location;
+}
+
 export function getGameMapUrl(game: { location?: string; mapUrlOverride?: string }): string {
   if (game.mapUrlOverride) return game.mapUrlOverride;
   const venue = getVenueName(game.location || '');

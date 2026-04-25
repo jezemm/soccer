@@ -49,6 +49,12 @@ function getVenueName(location: string): string {
   return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, "").trim() || location;
 }
 
+function formatVenueDisplay(location: string): string {
+  const venue = getVenueName(location);
+  const pitch = location.slice(venue.length).trim();
+  return pitch ? `${venue} - ${pitch}` : location;
+}
+
 const DEFAULT_DUTIES = [
   { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
   { id: "goalie_2", label: "Goalie (2nd Half)", emoji: "", applicableTo: "both" },
@@ -124,7 +130,7 @@ export const fixturesICS = onRequest(
         // Build description with real newlines — escIcs converts them to \n
         const lines: string[] = [
           `${g.isHome ? "🏠 Home Match" : "✈️ Away Match"}`,
-          `📍 ${locationName || "TBC"}`,
+          `📍 ${locationName ? formatVenueDisplay(locationName) : "TBC"}`,
           `⏰ Kick-off ${kickoffTime} · Arrive by ${arrivalTime}`,
         ];
 
