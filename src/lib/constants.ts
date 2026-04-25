@@ -335,7 +335,7 @@ export function getDefaultAvatarConfig(name: string): AvatarConfig {
     hairColor: pick(AVATAR_OPTIONS.hairColor, 2),
     facialHairType: 'Blank',
     facialHairColor: 'Brown',
-    clotheType: pick(AVATAR_OPTIONS.clotheType, 3),
+    clotheType: 'EMJSCJersey',
     clotheColor: pick(AVATAR_OPTIONS.clotheColor, 4),
     graphicType: 'Bat',
     eyeType: pick(AVATAR_OPTIONS.eyeType, 5),
