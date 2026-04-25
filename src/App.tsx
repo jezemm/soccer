@@ -1683,8 +1683,19 @@ export default function App() {
                     <MobileNavItem active={view === 'messages'} onClick={() => { setView('messages'); setMobileMenuOpen(false); }} icon={<MessageCircle className="w-5 h-5" />} label="Messages" badge={totalUnreadMessages} />
                   )}
                   <MobileNavItem active={view === 'help'} onClick={() => { setView('help'); setMobileMenuOpen(false); }} icon={<HelpCircle className="w-5 h-5" />} label="Help & FAQ" />
-                  <MobileNavItem active={false} onClick={() => { setShowFeatureModal(true); setMobileMenuOpen(false); }} icon={<Lightbulb className="w-5 h-5" />} label="Request a Feature" />
                   {isAdmin && <MobileNavItem active={view === 'admin'} onClick={() => { setView('admin'); setMobileMenuOpen(false); }} icon={<Settings className="w-5 h-5" />} label="Admin Hub" />}
+                  <div className="border-t border-slate-100 pt-2 mt-1">
+                    <button
+                      onClick={() => { setShowFeatureModal(true); setMobileMenuOpen(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 transition-all active:scale-[0.98]"
+                    >
+                      <Lightbulb className="w-4 h-4 shrink-0" />
+                      <div className="text-left">
+                        <p className="text-[9px] font-black uppercase tracking-widest leading-none">Request a Feature</p>
+                        <p className="text-[8px] font-medium text-amber-600/70 leading-none mt-0.5">Got an idea?</p>
+                      </div>
+                    </button>
+                  </div>
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                       <img 
