@@ -1871,8 +1871,7 @@ export default function App() {
                       {(() => {
                         const visibleAnn = announcements.filter((ann: Announcement) =>
                           ann.type !== 'player_feedback' ||
-                          ann.targetPlayer === userName ||
-                          isAdmin
+                          ann.targetPlayer === userName
                         );
                         if (visibleAnn.length === 0) return null;
                         return (
@@ -2180,7 +2179,7 @@ export default function App() {
                                   </button>
                                 ))}
                               </div>
-                              {userName && (
+                              {userName && !isAdmin && (
                                 <button onClick={() => setDutyFilter(f => !f)}
                                   className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-xl border transition-colors ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
                                   On Duty
