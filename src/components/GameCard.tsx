@@ -61,7 +61,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             )}
           </div>
           <div className="leading-tight">
-            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-lg font-black text-emjsc-navy uppercase italic truncate">Vs {club || team}</p>{club && team && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{team}</p>}</>; })()}
+            {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-lg font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{team}</p>}</>; })()}
           </div>
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.location)}`}
