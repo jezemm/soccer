@@ -341,7 +341,7 @@ export function getDefaultAvatarConfig(name: string): AvatarConfig {
     eyeType: pick(AVATAR_OPTIONS.eyeType, 5),
     eyebrowType: pick(AVATAR_OPTIONS.eyebrowType, 6),
     mouthType: pick(AVATAR_OPTIONS.mouthType, 7),
-    skinColor: pick(AVATAR_OPTIONS.skinColor, 8),
+    skinColor: 'Yellow',
   };
 }
 
