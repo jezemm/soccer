@@ -42,10 +42,12 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
   const [editStaffName, setEditStaffName] = React.useState('');
   const [editStaffRole, setEditStaffRole] = React.useState('coach');
   const [editStaffPass, setEditStaffPass] = React.useState('');
+  const [editStaffTagline, setEditStaffTagline] = React.useState('');
   const [addingStaff, setAddingStaff] = React.useState(false);
   const [newStaffName, setNewStaffName] = React.useState('');
   const [newStaffRole, setNewStaffRole] = React.useState('coach');
   const [newStaffPass, setNewStaffPass] = React.useState('');
+  const [newStaffTagline, setNewStaffTagline] = React.useState('');
 
   const startEdit = (i: number) => { setEditingIdx(i); setEditName(squad[i].name); setEditFact(squad[i].fact); };
   const saveEdit = () => {
@@ -73,11 +75,12 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
   const startEditStaff = (i: number) => {
     setEditingStaffIdx(i); setEditStaffName(staffAccounts[i].name);
     setEditStaffRole(staffAccounts[i].role); setEditStaffPass(staffAccounts[i].password);
+    setEditStaffTagline(staffAccounts[i].tagline || '');
   };
   const saveEditStaff = () => {
     if (!editStaffName.trim()) return;
     onUpdateStaff(staffAccounts.map((a: any, i: number) => i === editingStaffIdx
-      ? { ...a, name: editStaffName.trim(), role: editStaffRole, password: editStaffPass || a.password }
+      ? { ...a, name: editStaffName.trim(), role: editStaffRole, password: editStaffPass || a.password, tagline: editStaffTagline.trim() }
       : a));
     setEditingStaffIdx(null);
   };
@@ -89,8 +92,8 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
   const addStaff = () => {
     if (!newStaffName.trim() || !newStaffPass.trim()) return;
     const id = `staff_${Date.now()}`;
-    onUpdateStaff([...staffAccounts, { id, name: newStaffName.trim(), role: newStaffRole, password: newStaffPass.trim() }]);
-    setNewStaffName(''); setNewStaffRole('coach'); setNewStaffPass(''); setAddingStaff(false);
+    onUpdateStaff([...staffAccounts, { id, name: newStaffName.trim(), role: newStaffRole, password: newStaffPass.trim(), tagline: newStaffTagline.trim() }]);
+    setNewStaffName(''); setNewStaffRole('coach'); setNewStaffPass(''); setNewStaffTagline(''); setAddingStaff(false);
   };
 
   const editPencil = (
@@ -118,6 +121,7 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
               <tr className="bg-slate-100 border-b border-slate-200">
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Name</th>
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Role</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Tagline</th>
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Password</th>
                 {isManager && <th className="px-2 py-2 w-16" />}
               </tr>
@@ -132,6 +136,7 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
                       <option value="manager">Manager</option>
                     </select>
                   </td>
+                  <td className="px-3 py-2 hidden md:table-cell"><input value={editStaffTagline} onChange={e => setEditStaffTagline(e.target.value)} placeholder="Tagline…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" /></td>
                   <td className="px-3 py-2"><input value={editStaffPass} onChange={e => setEditStaffPass(e.target.value)} placeholder="New password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono" /></td>
                   <td className="px-2 py-2"><div className="flex gap-1">
                     <button onClick={saveEditStaff} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
@@ -139,11 +144,12 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
                   </div></td>
                 </tr>
               ) : (
-                <tr key={a.id} className="bg-white hover:bg-slate-50 group transition-colors">
+                <tr key={a.id} className="bg-white hover:bg-slate-50 transition-colors">
                   <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{a.name}</span></td>
                   <td className="px-3 py-2.5 hidden sm:table-cell"><span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${a.role === 'manager' ? 'bg-emjsc-navy/10 text-emjsc-navy' : 'bg-amber-50 text-amber-700'}`}>{a.role}</span></td>
+                  <td className="px-3 py-2.5 hidden md:table-cell"><p className="text-[9px] text-slate-500 line-clamp-1">{a.tagline || ''}</p></td>
                   <td className="px-3 py-2"><span className="text-[10px] font-mono text-slate-400">{'•'.repeat(Math.min(a.password?.length || 0, 8))}</span></td>
-                  {isManager && <td className="px-2 py-2.5"><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isManager && <td className="px-2 py-2.5"><div className="flex gap-1">
                     <button onClick={() => startEditStaff(i)} className="p-1 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg">{editPencil}</button>
                     {staffAccounts.length > 1 && <button onClick={() => removeStaff(i)} className="p-1 text-emjsc-red hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3" /></button>}
                   </div></td>}
@@ -158,6 +164,7 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
                       <option value="manager">Manager</option>
                     </select>
                   </td>
+                  <td className="px-3 py-2 hidden md:table-cell"><input value={newStaffTagline} onChange={e => setNewStaffTagline(e.target.value)} placeholder="Tagline (optional)…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none placeholder:text-slate-300" /></td>
                   <td className="px-3 py-2"><input value={newStaffPass} onChange={e => setNewStaffPass(e.target.value)} placeholder="Password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono placeholder:text-slate-300" /></td>
                   <td className="px-2 py-2"><div className="flex gap-1">
                     <button onClick={addStaff} className="p-1 bg-green-600 text-white rounded-lg"><Check className="w-3 h-3" /></button>
