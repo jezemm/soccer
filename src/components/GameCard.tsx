@@ -12,11 +12,16 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const venueName = getVenueName(game.location || '');
+  // Full location minus pitch designator — keeps suburb/state for accurate geocoding
+  const travelDest = game.location
+    ? game.location.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
+    : venueName + ' Melbourne VIC';
+
   const [myTravelMins, setMyTravelMins] = useState<number | null>(null);
   const [myTravelStatus, setMyTravelStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
 
   const fetchMyTravel = () => {
-    if (!venueName) return;
+    if (!travelDest) return;
     setMyTravelStatus('locating');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -25,7 +30,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
         fetch(
           `${FUNCTIONS_BASE}/travelTime` +
           `?origin=${encodeURIComponent(origin)}` +
-          `&destination=${encodeURIComponent(venueName + ' Melbourne VIC')}` +
+          `&destination=${encodeURIComponent(travelDest)}` +
           `&departureTime=${departureSecs}`
         )
           .then(r => r.json())
@@ -44,7 +49,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
 
   // Auto-fetch if location permission already granted
   useEffect(() => {
-    if (!venueName || !game.isHome) return;
+    if (!travelDest || !game.isHome) return;
     navigator.permissions?.query({ name: 'geolocation' as PermissionName })
       .then(result => { if (result.state === 'granted') fetchMyTravel(); })
       .catch(() => {});
@@ -95,7 +100,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
               </div>
             )}
             {/* Home: my-location travel time */}
-            {game.isHome && venueName && (
+            {game.isHome && travelDest && (
               myTravelStatus === 'done' ? (
                 <button
                   onClick={getMyTravel}

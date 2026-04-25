@@ -98,8 +98,13 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   const [myTravelMinutes, setMyTravelMinutes] = useState<number | null>(null);
   const [myTravelError, setMyTravelError] = useState<string | null>(null);
 
+  // Full location minus pitch designator — keeps suburb/state for accurate geocoding
+  const travelDest = gameLocation
+    ? gameLocation.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
+    : venueName + ' Melbourne VIC';
+
   const getMyTravelTime = () => {
-    if (!venueName) return;
+    if (!travelDest) return;
     setMyTravelStatus('locating');
     setMyTravelError(null);
     navigator.geolocation.getCurrentPosition(
@@ -110,7 +115,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
         fetch(
           `${FUNCTIONS_BASE}/travelTime` +
           `?origin=${encodeURIComponent(origin)}` +
-          `&destination=${encodeURIComponent(venueName + ' Melbourne VIC')}` +
+          `&destination=${encodeURIComponent(travelDest)}` +
           `&departureTime=${departureSecs}`
         )
           .then(r => r.json())
@@ -130,7 +135,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
 
   // Auto-fetch if location permission already granted
   useEffect(() => {
-    if (!venueName) return;
+    if (!travelDest) return;
     navigator.permissions?.query({ name: 'geolocation' as PermissionName })
       .then(result => { if (result.state === 'granted') getMyTravelTime(); })
       .catch(() => {});

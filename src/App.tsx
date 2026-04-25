@@ -1962,182 +1962,6 @@ export default function App() {
                         </div>
                       )}
 
-                      {gamesLoaded && games.length > 0 && (() => {
-                        const HOUR_MS = 60 * 60 * 1000;
-                        const activeGames = games.filter(g => now - new Date(g.date).getTime() < 2 * HOUR_MS);
-                        const completedGames = games.filter(g => now - new Date(g.date).getTime() >= 2 * HOUR_MS);
-                        const isInProgress = (g: GameType) => { const ms = now - new Date(g.date).getTime(); return ms >= HOUR_MS && ms < 2 * HOUR_MS; };
-
-                        if (activeGames.length === 0) return null;
-                        const game = activeGames[0];
-                        const date = new Date(game.date);
-                        const dateKey = game.date.split('T')[0];
-                        const isUnavailable = availabilities.some(a => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
-                        const totalUnavailableCount = availabilities.filter(a => a.dateKey === dateKey && a.isUnavailable).length;
-
-                        // Arrival time is fixed at 30 minutes prior to kick off
-                        const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const nextApplicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [
-                          { id: 'goalie', label: 'Goalie', applicableTo: 'both' },
-                          { id: 'snack_provider', label: 'Snack', applicableTo: 'both' },
-                          { id: 'pitch_marshal', label: 'Marshal', applicableTo: 'home' },
-                          { id: 'referee', label: 'Referee', applicableTo: 'home' }
-                        ]).filter((d: any) => {
-                          if (d.applicableTo === 'both' || !d.applicableTo) return true;
-                          if (d.applicableTo === 'home' && game.isHome) return true;
-                          if (d.applicableTo === 'away' && !game.isHome) return true;
-                          return false;
-                        });
-                        const getNextAssignee = (d: any) =>
-                          (game.assignments?.[d.id]) ||
-                          (d.id === 'goalie' ? game.goalie :
-                           d.id === 'snack_provider' ? game.snackProvider :
-                           d.id === 'pitch_marshal' ? game.pitchMarshal :
-                           d.id === 'referee' ? game.referee : null);
-                        const isMissingDuties = nextApplicableDuties.some((d: any) => !getNextAssignee(d));
-                        const isSwapPending = nextApplicableDuties.some((d: any) =>
-                          (game.swapRequests?.[d.id]) ||
-                          (d.id === 'goalie' ? game.goalieSwapRequested :
-                           d.id === 'snack_provider' ? game.snackSwapRequested :
-                           d.id === 'pitch_marshal' ? game.marshalSwapRequested :
-                           d.id === 'referee' ? game.refereeSwapRequested : false)
-                        );
-
-                        return (
-                          <section className="space-y-4">
-                            <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Next Match</h2>
-                            <div
-                              onClick={isInProgress(game) ? undefined : () => navigate('/game/' + game.id)}
-                              className={`bg-white border-2 border-emjsc-navy rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group transition-all duration-300 ${isInProgress(game) ? 'opacity-50 grayscale cursor-default' : 'cursor-pointer hover:border-emjsc-red'}`}
-                            >
-                              <div className="absolute top-0 right-0 bg-emjsc-navy text-white px-6 py-2 rounded-bl-3xl font-black uppercase tracking-tighter text-[9px] shadow-lg group-hover:bg-emjsc-red transition-colors flex items-center gap-2">
-                                <Zap className="w-3 h-3" />
-                                {isInProgress(game) ? 'In Progress' : 'Upcoming'}
-                              </div>
-                              <div className="flex flex-col gap-6">
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-black bg-emjsc-navy text-white px-2 py-0.5 rounded uppercase tracking-widest">
-                                      {game.isHome ? 'Home' : 'Away'}
-                                    </span>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                      {date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' })}
-                                    </span>
-                                    {isUnavailable && (
-                                      <span className="text-[8px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-black uppercase tracking-tighter flex items-center gap-1">
-                                        <UserMinus className="w-2.5 h-2.5" />
-                                        You're Unavailable
-                                      </span>
-                                    )}
-                                    {totalUnavailableCount > 0 && !isUnavailable && (
-                                      <span className="text-[8px] bg-red-50 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-tighter flex items-center gap-1">
-                                        <Users className="w-2.5 h-2.5" />
-                                        {totalUnavailableCount} Player{totalUnavailableCount > 1 ? 's' : ''} Out
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="space-y-1">
-                                    {(() => { const { club, team } = splitOpponent(game.opponent); return <><h3 className="text-3xl sm:text-4xl font-black text-emjsc-navy tracking-tight leading-none uppercase italic">vs {club || team}</h3>{club && team && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
-                                    <a
-                                      href={getGameMapUrl(game)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-tighter hover:text-emjsc-red transition-colors w-fit group/loc"
-                                    >
-                                      <MapPin className="w-3.5 h-3.5 text-emjsc-red" />
-                                      <span className="line-clamp-1">{formatVenueDisplay(game.location)}</span>
-                                    </a>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleToggleAvailability(userName, dateKey); }}
-                                      className="flex items-center gap-1.5 active:scale-95 transition-all mt-2.5"
-                                    >
-                                      <div className={`w-8 h-4 rounded-full relative transition-colors duration-200 ${isUnavailable ? 'bg-red-400' : 'bg-green-400'}`}>
-                                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-200 ${isUnavailable ? 'left-4' : 'left-0.5'}`} />
-                                      </div>
-                                      <span className={`text-[9px] font-black uppercase ${isUnavailable ? 'text-red-600' : 'text-green-700'}`}>
-                                        {isUnavailable ? 'Unavailable to Play' : 'Available to Play'}
-                                      </span>
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-4">
-                                  <div className="space-y-0.5">
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Kick Off</p>
-                                    <p className="text-sm font-black text-emjsc-navy uppercase">{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Arrival</p>
-                                    <p className="text-sm font-black text-emjsc-red uppercase">{arrivalTime}</p>
-                                  </div>
-                                </div>
-
-                                <div className="border-t border-slate-100 pt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Duties</span>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className={`w-2 h-2 rounded-full ${isSwapPending ? 'bg-orange-500 animate-pulse' : isMissingDuties ? 'bg-red-500' : 'bg-green-500'}`} />
-                                      <p className={`text-[9px] font-black uppercase tracking-tight ${isSwapPending ? 'text-orange-600' : isMissingDuties ? 'text-emjsc-red' : 'text-green-600'}`}>
-                                        {isSwapPending ? 'Swap Needed' : isMissingDuties ? 'Help Wanted' : 'All Ready'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {nextApplicableDuties.map((duty: any) => {
-                                      const assignee = getNextAssignee(duty);
-                                      const swap = (game.swapRequests && game.swapRequests[duty.id]) ||
-                                        (duty.id === 'goalie' ? game.goalieSwapRequested : duty.id === 'snack_provider' ? game.snackSwapRequested : duty.id === 'pitch_marshal' ? game.marshalSwapRequested : duty.id === 'referee' ? game.refereeSwapRequested : false);
-                                      const isMe = assignee === userName;
-                                      const syncing = isSyncing === `${game.id}-${duty.id}`;
-                                      const takenByOther = !isMe && !!assignee && !swap;
-              const blocked = !isMe && (takenByOther || isUnavailable);
-                                      return (
-                                        <button
-                                          key={duty.id}
-                                          onClick={() => handleSignUp(game.id, duty.id)}
-                                          disabled={syncing || blocked}
-                                          className={`px-2.5 py-1.5 rounded-lg border transition-all ${
-                                            isMe
-                                              ? swap ? 'bg-orange-50 border-orange-300 hover:bg-orange-100 active:scale-95' : 'bg-red-50 border-emjsc-red hover:bg-red-100 active:scale-95'
-
-                                              : swap
-                                                ? 'bg-orange-50 border-orange-200 ring-1 ring-orange-300'
-                                                : takenByOther
-                                                  ? 'bg-white border-slate-200 cursor-not-allowed'
-                                                  : isUnavailable
-                                                    ? 'bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed'
-                                                    : 'bg-orange-50 border-orange-200 ring-1 ring-orange-300 active:scale-95'
-                                          } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
-                                        >
-                                          <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-0 truncate">{duty.emoji && <span className="mr-0.5">{duty.emoji}</span>}{duty.label}</p>
-                                          <p className={`text-[9px] font-black uppercase truncate ${
-                                            isMe ? (swap ? 'text-orange-600' : 'text-emjsc-red')
-                                              : swap ? 'text-orange-600'
-                                              : takenByOther ? 'text-slate-500'
-                                              : isUnavailable ? 'text-slate-300'
-                                              : 'text-orange-600'
-                                          }`}>
-                                            {syncing ? '...' : isMe ? (swap ? 'Cancel' : <span className="flex items-center gap-0.5">{(([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee!.split(' '))}<ArrowLeftRight className="w-2.5 h-2.5 shrink-0" /></span>) : swap ? 'Take It' : assignee ? (([f,...r])=>f+(r[0]?' '+r[0][0]:''))(assignee.split(' ')) : isUnavailable ? 'N/A' : 'Claim'}
-                                          </p>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {game.travelTimeMinutes && (
-                                  <div className="flex items-center gap-1 text-[9px] font-black text-emjsc-red uppercase tracking-widest bg-red-50 px-3 py-2 rounded-xl w-fit">
-                                    <Car className="w-3 h-3" />
-                                    {game.travelTimeMinutes} min from Home Ground
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </section>
-                        );
-                      })()}
-
                       {(() => {
                         const HOUR_MS = 60 * 60 * 1000;
                         const nextGame = games.find((g: GameType) => now - new Date(g.date).getTime() < 2 * HOUR_MS);
@@ -2148,7 +1972,6 @@ export default function App() {
                           return g.goalie === userName || g.snackProvider === userName || g.pitchMarshal === userName || g.referee === userName;
                         };
                         const fixtureGames = games
-                          .filter((g: GameType) => g.id !== nextGame?.id)
                           .filter((g: GameType) => {
                             const kickoff = new Date(g.date).getTime();
                             if (statusFilter === 'upcoming' && kickoff <= now) return false;
@@ -2200,22 +2023,36 @@ export default function App() {
                                 ) : fixtureGames.length === 0 ? (
                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 py-8 text-center w-full">No matches</p>
                                 ) : (
-                                  fixtureGames.map((game: GameType) => (
-                                    <GameCard
-                                      key={game.id}
-                                      game={game}
-                                      userName={userName}
-                                      homeGround={homeGround}
-                                      feedbacks={feedbacks}
-                                      availabilities={availabilities}
-                                      dutiesConfig={dutiesConfig}
-                                      onSignUp={isDimmed(game) ? undefined : handleSignUp}
-                                      onToggleAvailability={isDimmed(game) ? undefined : handleToggleAvailability}
-                                      isSyncing={isSyncing}
-                                      dimmed={isDimmed(game)}
-                                      onClick={() => navigate('/game/' + game.id)}
-                                    />
-                                  ))
+                                  fixtureGames.map((game: GameType) => {
+                                    const isNext = game.id === nextGame?.id;
+                                    const card = (
+                                      <GameCard
+                                        game={game}
+                                        userName={userName}
+                                        homeGround={homeGround}
+                                        feedbacks={feedbacks}
+                                        availabilities={availabilities}
+                                        dutiesConfig={dutiesConfig}
+                                        onSignUp={isDimmed(game) ? undefined : handleSignUp}
+                                        onToggleAvailability={isDimmed(game) ? undefined : handleToggleAvailability}
+                                        isSyncing={isSyncing}
+                                        dimmed={isDimmed(game)}
+                                        onClick={() => navigate('/game/' + game.id)}
+                                      />
+                                    );
+                                    if (!isNext) return <React.Fragment key={game.id}>{card}</React.Fragment>;
+                                    return (
+                                      <div key={game.id} className="relative mt-3">
+                                        <div className="absolute -top-3 left-3 z-10 bg-emjsc-navy text-white text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                                          <Zap className="w-2.5 h-2.5" />
+                                          Next Match
+                                        </div>
+                                        <div className="ring-2 ring-emjsc-navy rounded-[1.75rem] shadow-md">
+                                          {card}
+                                        </div>
+                                      </div>
+                                    );
+                                  })
                                 )}
                               </div>
                             </section>
