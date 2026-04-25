@@ -2000,26 +2000,26 @@ export default function App() {
                         const anyFilterActive = statusFilter !== 'all' || venueFilter !== 'all' || dutyFilter;
                         return (
                           <>
-                            <div className="flex flex-wrap gap-2">
-                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                            <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
                                 {(['all', 'upcoming', 'completed'] as const).map(s => (
                                   <button key={s} onClick={() => setStatusFilter(s)}
-                                    className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest transition-colors ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
-                                    {s === 'all' ? 'All' : s === 'upcoming' ? 'To Play' : 'Completed'}
+                                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${statusFilter === s ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {s === 'all' ? 'All' : s === 'upcoming' ? 'Next' : 'Done'}
                                   </button>
                                 ))}
                               </div>
-                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                              <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
                                 {(['all', 'home', 'away'] as const).map(v => (
                                   <button key={v} onClick={() => setVenueFilter(v)}
-                                    className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest transition-colors ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
-                                    {v === 'all' ? 'All Venues' : v}
+                                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${venueFilter === v ? 'bg-emjsc-navy text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {v === 'all' ? 'All' : v}
                                   </button>
                                 ))}
                               </div>
                               {userName && !isAdmin && (
                                 <button onClick={() => setDutyFilter(f => !f)}
-                                  className={`px-3.5 py-2 text-xs font-black uppercase tracking-widest rounded-xl border transition-colors ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
+                                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-colors shrink-0 whitespace-nowrap ${dutyFilter ? 'bg-emjsc-red text-white border-emjsc-red' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600'}`}>
                                   On Duty
                                 </button>
                               )}
@@ -2246,7 +2246,6 @@ export default function App() {
                                   <p className="text-xl font-black text-slate-800 tracking-tighter uppercase">{player.name}</p>
                                   {isMe && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0 mt-1">You</span>}
                                 </div>
-                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight opacity-60 italic leading-none mt-1">EMJSC • U8 White Saturday</p>
                               </div>
                             </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Navigation, ArrowLeftRight, Car, RefreshCw, Users } from 'lucide-react';
+import { Navigation, ArrowLeftRight, Car, RefreshCw, Users, Home, MapPin } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
@@ -118,40 +118,6 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             <span className="text-xs text-emjsc-navy font-black uppercase tracking-tight">Navigate to {venueName}</span>
           </a>
 
-          {/* Travel time badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {game.travelTimeMinutes && (
-              <div className="flex items-center gap-1 text-[11px] font-black text-emjsc-red uppercase bg-red-50/50 px-2 py-1 rounded-lg border border-red-100/50">
-                <Car className="w-3 h-3" />
-                {game.travelTimeMinutes}m from Home Ground
-              </div>
-            )}
-            {travelDest && (
-              myTravelStatus === 'done' ? (
-                <button
-                  onClick={handleRequestTravel}
-                  className="flex items-center gap-1 text-[11px] font-black text-emjsc-red uppercase bg-red-50/50 px-2 py-1 rounded-lg border border-red-100/50 active:scale-95"
-                >
-                  <Car className="w-3 h-3" />
-                  {myTravelMins}m from My Location
-                </button>
-              ) : myTravelStatus === 'locating' ? (
-                <span className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  Getting time…
-                </span>
-              ) : (
-                <button
-                  onClick={handleRequestTravel}
-                  className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-200 active:scale-95"
-                >
-                  <Car className="w-3 h-3" />
-                  My Travel Time
-                </button>
-              )
-            )}
-          </div>
-
           {/* Availability toggle */}
           {onToggleAvailability && (
             <button
@@ -180,6 +146,38 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           <div className="flex flex-col items-end gap-0.5">
             <p className="text-xs text-emjsc-navy font-black leading-none uppercase tracking-tighter">ARRIVE {arrivalTime}</p>
             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">KO {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+          <div className="flex flex-col items-end gap-1 mt-0.5">
+            {game.travelTimeMinutes && (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                <Home className="w-3 h-3 shrink-0" />
+                <span>{game.travelTimeMinutes}m</span>
+              </div>
+            )}
+            {travelDest && (
+              myTravelStatus === 'done' ? (
+                <button
+                  onClick={handleRequestTravel}
+                  className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-emjsc-red active:scale-95 transition-all"
+                >
+                  <MapPin className="w-3 h-3 shrink-0" />
+                  <span>{myTravelMins}m</span>
+                </button>
+              ) : myTravelStatus === 'locating' ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-300">
+                  <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
+                </span>
+              ) : (
+                <button
+                  onClick={handleRequestTravel}
+                  className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-slate-500 active:scale-95 transition-all"
+                  title="Get my travel time"
+                >
+                  <MapPin className="w-3 h-3 shrink-0" />
+                  <span>?m</span>
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>

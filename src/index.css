@@ -17,6 +17,9 @@ body {
   @apply w-full max-w-md md:max-w-4xl lg:max-w-6xl mx-auto min-h-screen bg-white md:bg-transparent shadow-[0_0_50px_rgba(0,0,0,0.1)] md:shadow-none;
 }
 
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
