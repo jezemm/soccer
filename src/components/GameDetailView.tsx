@@ -210,17 +210,15 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
               <Calendar className="w-4 h-4 text-emjsc-red" />
               {date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })} • {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Kick Off
             </p>
-            <p className="text-emjsc-navy text-xs font-black uppercase tracking-widest flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-emjsc-red" />
-              <a
-                href={getGameMapUrl(game)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
-                {formatVenueDisplay(game.location)}
-              </a>
-            </p>
+            <a
+              href={getGameMapUrl(game)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all w-fit"
+            >
+              <Navigation className="w-3.5 h-3.5 text-emjsc-red shrink-0" />
+              <span className="text-[10px] text-emjsc-navy font-black uppercase tracking-tight">Get Directions · {formatVenueDisplay(game.location)}</span>
+            </a>
             {!game.isHome && game.travelTimeMinutes && (
               <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
                 <Car className="w-4 h-4 text-emjsc-red" />

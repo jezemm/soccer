@@ -260,7 +260,7 @@ export function getGameMapUrl(game: { location?: string; mapUrlOverride?: string
   const dest = game.location
     ? game.location.split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0].trim()
     : getVenueName(game.location || '') + ' Melbourne VIC';
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
 }
 
 export function splitOpponent(name: string): { club: string; team: string } {
