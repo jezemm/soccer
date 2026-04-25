@@ -120,8 +120,8 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
             <thead>
               <tr className="bg-slate-100 border-b border-slate-200">
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Name</th>
-                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Role</th>
-                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Tagline</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Role</th>
+                <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Description</th>
                 <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Password</th>
                 {isManager && <th className="px-2 py-2 w-16" />}
               </tr>
@@ -130,13 +130,13 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
               {staffAccounts.map((a: any, i: number) => editingStaffIdx === i ? (
                 <tr key={a.id} className="bg-blue-50">
                   <td className="px-3 py-2"><input autoFocus value={editStaffName} onChange={e => setEditStaffName(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none" /></td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
+                  <td className="px-3 py-2 hidden md:table-cell">
                     <select value={editStaffRole} onChange={e => setEditStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
                       <option value="coach">Coach</option>
                       <option value="manager">Manager</option>
                     </select>
                   </td>
-                  <td className="px-3 py-2 hidden md:table-cell"><input value={editStaffTagline} onChange={e => setEditStaffTagline(e.target.value)} placeholder="Tagline…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" /></td>
+                  <td className="px-3 py-2 hidden sm:table-cell"><input value={editStaffTagline} onChange={e => setEditStaffTagline(e.target.value)} placeholder="Description shown on Squad page…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none" /></td>
                   <td className="px-3 py-2"><input value={editStaffPass} onChange={e => setEditStaffPass(e.target.value)} placeholder="New password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono" /></td>
                   <td className="px-2 py-2"><div className="flex gap-1">
                     <button onClick={saveEditStaff} className="p-1 bg-emjsc-navy text-white rounded-lg"><Check className="w-3 h-3" /></button>
@@ -146,8 +146,8 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
               ) : (
                 <tr key={a.id} className="bg-white hover:bg-slate-50 transition-colors">
                   <td className="px-3 py-2.5"><span className="text-[10px] font-black text-emjsc-navy uppercase">{a.name}</span></td>
-                  <td className="px-3 py-2.5 hidden sm:table-cell"><span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${a.role === 'manager' ? 'bg-emjsc-navy/10 text-emjsc-navy' : 'bg-amber-50 text-amber-700'}`}>{a.role}</span></td>
-                  <td className="px-3 py-2.5 hidden md:table-cell"><p className="text-[9px] text-slate-500 line-clamp-1">{a.tagline || ''}</p></td>
+                  <td className="px-3 py-2.5 hidden md:table-cell"><span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${a.role === 'manager' ? 'bg-emjsc-navy/10 text-emjsc-navy' : 'bg-amber-50 text-amber-700'}`}>{a.role}</span></td>
+                  <td className="px-3 py-2.5 hidden sm:table-cell"><p className="text-[9px] text-slate-500 line-clamp-1">{a.tagline || <span className="italic text-slate-300">No description</span>}</p></td>
                   <td className="px-3 py-2"><span className="text-[10px] font-mono text-slate-400">{'•'.repeat(Math.min(a.password?.length || 0, 8))}</span></td>
                   {isManager && <td className="px-2 py-2.5"><div className="flex gap-1">
                     <button onClick={() => startEditStaff(i)} className="p-1 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg">{editPencil}</button>
@@ -158,13 +158,13 @@ function SquadManager({ squad, onUpdate, passwords, onUpdatePasswords, staffAcco
               {addingStaff && (
                 <tr className="bg-green-50 border-t border-green-100">
                   <td className="px-3 py-2"><input autoFocus value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Full name…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none placeholder:text-slate-300" /></td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
+                  <td className="px-3 py-2 hidden md:table-cell">
                     <select value={newStaffRole} onChange={e => setNewStaffRole(e.target.value)} className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none">
                       <option value="coach">Coach</option>
                       <option value="manager">Manager</option>
                     </select>
                   </td>
-                  <td className="px-3 py-2 hidden md:table-cell"><input value={newStaffTagline} onChange={e => setNewStaffTagline(e.target.value)} placeholder="Tagline (optional)…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none placeholder:text-slate-300" /></td>
+                  <td className="px-3 py-2 hidden sm:table-cell"><input value={newStaffTagline} onChange={e => setNewStaffTagline(e.target.value)} placeholder="Description (optional)…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 outline-none placeholder:text-slate-300" /></td>
                   <td className="px-3 py-2"><input value={newStaffPass} onChange={e => setNewStaffPass(e.target.value)} placeholder="Password…" className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-emjsc-navy outline-none font-mono placeholder:text-slate-300" /></td>
                   <td className="px-2 py-2"><div className="flex gap-1">
                     <button onClick={addStaff} className="p-1 bg-green-600 text-white rounded-lg"><Check className="w-3 h-3" /></button>
