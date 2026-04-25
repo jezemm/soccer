@@ -2219,7 +2219,7 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-2xl mx-auto"
                   >
-                    <HelpView faqItems={faqItems} />
+                    <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} />
                   </motion.div>
                 )}
               </motion.div>

@@ -3,12 +3,38 @@ import { HelpCircle, ChevronDown, Trash2 } from 'lucide-react';
 import { SEED_FAQS } from '../lib/constants';
 import type { FaqItem } from '../lib/firebase';
 
+const ALL_ROLES = ['player', 'coach', 'manager'];
+const ROLE_LABELS: Record<string, string> = { player: 'Players', coach: 'Coaches', manager: 'Admins' };
+
+function VisibilityCheckboxes({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {ALL_ROLES.map(role => (
+        <label key={role} className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={value.includes(role)}
+            onChange={(e) => {
+              const next = e.target.checked ? [...value, role] : value.filter(r => r !== role);
+              onChange(next.length > 0 ? next : value); // prevent empty
+            }}
+            className="w-3.5 h-3.5 rounded border-slate-300 text-emjsc-navy focus:ring-emjsc-navy"
+          />
+          <span className="text-[9px] font-black uppercase text-slate-500">{ROLE_LABELS[role]}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQ, setEditQ] = useState('');
   const [editA, setEditA] = useState('');
+  const [editVisibleTo, setEditVisibleTo] = useState<string[]>(ALL_ROLES);
   const [newQ, setNewQ] = useState('');
   const [newA, setNewA] = useState('');
+  const [newVisibleTo, setNewVisibleTo] = useState<string[]>(ALL_ROLES);
   const [addStatus, setAddStatus] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
 
@@ -22,10 +48,15 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
     }
   }, [items]);
 
-  const startEdit = (item: any) => { setEditingId(item.id); setEditQ(item.question); setEditA(item.answer); };
+  const startEdit = (item: any) => {
+    setEditingId(item.id);
+    setEditQ(item.question);
+    setEditA(item.answer);
+    setEditVisibleTo(item.visibleTo || ALL_ROLES);
+  };
   const cancelEdit = () => setEditingId(null);
   const saveEdit = (item: any) => {
-    const updated = { ...item, question: editQ, answer: editA };
+    const updated = { ...item, question: editQ, answer: editA, visibleTo: editVisibleTo };
     setLocalItems(prev => prev.map(i => i.id === item.id ? updated : i));
     onUpdate(updated);
     setEditingId(null);
@@ -39,9 +70,14 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
   const handleAdd = async () => {
     if (!newQ.trim() || !newA.trim()) return;
     setAddStatus('Adding...');
-    const newItem = { question: newQ.trim(), answer: newA.trim(), order: (localItems.length > 0 ? Math.max(...localItems.map((i: any) => i.order)) + 1 : 1) };
+    const newItem = {
+      question: newQ.trim(),
+      answer: newA.trim(),
+      visibleTo: newVisibleTo,
+      order: (localItems.length > 0 ? Math.max(...localItems.map((i: any) => i.order)) + 1 : 1),
+    };
     await onAdd(newItem);
-    setNewQ(''); setNewA(''); setAddStatus(null);
+    setNewQ(''); setNewA(''); setNewVisibleTo(ALL_ROLES); setAddStatus(null);
   };
 
   const moveItem = (item: any, dir: -1 | 1) => {
@@ -103,6 +139,10 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
                     onChange={(e) => setEditA(e.target.value)}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Visible To</label>
+                  <VisibilityCheckboxes value={editVisibleTo} onChange={setEditVisibleTo} />
+                </div>
                 <div className="flex gap-2">
                   <button onClick={() => saveEdit(item)} className="flex-1 bg-emjsc-navy text-white text-[9px] font-black uppercase py-2 rounded-xl active:scale-95 transition-all">Save</button>
                   <button onClick={cancelEdit} className="px-4 bg-slate-100 text-slate-500 text-[9px] font-black uppercase py-2 rounded-xl active:scale-95 transition-all">Cancel</button>
@@ -121,6 +161,11 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-emjsc-navy">{item.question}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{item.answer}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {(item.visibleTo || ALL_ROLES).map((r: string) => (
+                      <span key={r} className="text-[7px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">{ROLE_LABELS[r] ?? r}</span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => startEdit(item)} className="p-1.5 text-emjsc-navy hover:bg-emjsc-navy/10 rounded-lg transition-colors">
@@ -158,6 +203,10 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
             placeholder="Write the answer here..."
           />
         </div>
+        <div className="space-y-1.5">
+          <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Visible To</label>
+          <VisibilityCheckboxes value={newVisibleTo} onChange={setNewVisibleTo} />
+        </div>
         <button
           onClick={handleAdd}
           disabled={!newQ.trim() || !newA.trim()}
@@ -170,11 +219,19 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
   );
 }
 
-export function HelpView({ faqItems = [] }: any) {
+export function HelpView({ faqItems = [], userRole, isAdmin }: any) {
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (id: string) => setOpen(o => o === id ? null : id);
+
+  const viewerRole = isAdmin ? (userRole || 'manager') : 'player';
+
   const source = (faqItems as FaqItem[]).length > 0 ? (faqItems as FaqItem[]) : SEED_FAQS as any[];
-  const faqs = source.map((i: any) => ({ id: i.id, q: i.question, a: i.answer }));
+  const faqs = source
+    .filter((i: any) => {
+      const vis: string[] = i.visibleTo || ALL_ROLES;
+      return vis.includes(viewerRole);
+    })
+    .map((i: any) => ({ id: i.id, q: i.question, a: i.answer }));
 
   return (
     <div className="space-y-6 pb-24">

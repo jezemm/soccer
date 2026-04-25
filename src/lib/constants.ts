@@ -64,89 +64,103 @@ export const getTravelTime = (location: string) => {
   return "15-25 mins";
 };
 
-export const SEED_FAQS: Array<{ id: string; question: string; answer: string; order: number }> = [
+export const SEED_FAQS: Array<{ id: string; question: string; answer: string; order: number; visibleTo: string[] }> = [
   {
     id: 'faq_sign_in',
     question: 'How do I sign in?',
     answer: 'When you first open the hub, tap your name from the squad list. You\'ll then be asked to enter your player password — your team manager will have given this to you. Once signed in your session is saved on the device, so you won\'t need to sign in again unless you log out.',
     order: 1,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_schedule',
     question: 'How do I see upcoming matches?',
     answer: 'Open the Schedule tab (calendar icon at the bottom). The next upcoming match is shown as a large card at the top. All remaining fixtures are listed below in date order. Tap any match card to open the full game detail — kick-off time, arrival time, location, duty assignments, and unavailable players.',
     order: 2,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_next_match',
     question: 'What does the Next Match card show?',
     answer: 'The Next Match card shows the opponent club and team, whether it is a home or away game, the venue (tap it for Google Maps directions), kick-off time, your recommended arrival time (30 minutes before kick-off), an estimated travel time for away games, a summary of which duties are filled or still needed, and your availability toggle.',
     order: 3,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_directions',
     question: 'How do I get directions to a ground?',
     answer: 'Tap the red map pin icon and venue name on any match card or game detail screen. This opens Google Maps with the ground already set as your destination so you can get turn-by-turn directions from wherever you are.',
     order: 4,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_availability',
     question: 'How do I mark myself as unavailable for a match?',
     answer: 'Every match card and the game detail screen has a green/red pill toggle. Tap it to switch between "Available to Play" (green) and "Unavailable to Play" (red). The change is instant and visible to the coach and other parents straight away. Please update this as early as possible so the coach can plan accordingly. Matches where you\'ve marked yourself unavailable are shown dimmed in the fixture list.',
     order: 5,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_duties_what',
     question: 'What are match day duties?',
     answer: 'Duties are the volunteer roles that keep match day running. Player duties include Goalie (1st Half) and Goalie (2nd Half) — a player takes a turn in goal each half. Parent duties include Match Day Snacks (bringing a half-time treat for the team), Referee (officiating the match), and Pitch Marshal (managing the sideline). Referee and Pitch Marshal only apply to home games. Each match card shows a tile for every applicable duty.',
     order: 6,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_duties_claim',
     question: 'How do I claim a duty?',
     answer: 'On any match card or game detail screen, find the duty tile you want to take. If it shows "Claim", tap it — your name appears on that duty immediately and it updates for everyone. If a tile already shows someone\'s name (and they haven\'t requested a swap), that slot is taken and you\'ll see "Taken" instead.',
     order: 7,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_swap_request',
     question: 'I\'ve been assigned a duty but can\'t make it — how do I request a swap?',
     answer: 'Find your duty tile — it shows your name with a swap icon (⇄). Tap it to request a swap. The tile turns orange and shows "Swap Needed" so other parents can see you need someone to step in. To cancel the request, tap the tile again. Please request a swap as soon as you know so there\'s time for someone to pick it up.',
     order: 8,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_swap_take',
     question: 'How do I take a duty when someone has requested a swap?',
     answer: 'When a swap has been requested, the duty tile turns orange and shows "Take It". Tap "Take It" to take over — your name replaces theirs and the swap request clears automatically.',
     order: 9,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_training',
     question: 'How will I know if training is cancelled?',
     answer: 'If the coach or manager cancels training, a bold red banner appears at the very top of the app the moment you open it. Always check before leaving for training, especially in poor weather. The banner disappears automatically once training is back on.',
     order: 10,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_announcements',
     question: 'Where do I find team announcements?',
     answer: 'Announcements from the coach appear as cards at the very top of the Schedule page, above the Next Match card. A blue card is a general team message or update; a gold card highlights a team goal or achievement. Scroll up if you don\'t see them straight away.',
     order: 11,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_squad',
     question: 'What is the Squad tab?',
     answer: 'The Squad tab (people icon) lists every player in the team with their profile photo and bio. Tap a player\'s card to read their profile. If messaging is enabled you can also start a private chat from their profile page. It\'s a great way to put names to faces, especially at the start of a new season.',
     order: 12,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_messages',
     question: 'How does messaging work?',
     answer: 'If the Messages tab is visible (speech bubble icon), you can send private messages to other players and parents in the squad. Tap the tab to see your conversations — unread messages show a badge count on the icon. Tap a contact to open the chat. The coach and manager can also send messages to individuals from within the admin area.',
     order: 13,
+    visibleTo: ['player', 'coach', 'manager'],
   },
   {
     id: 'faq_contact',
     question: 'Something isn\'t working — who do I contact?',
     answer: 'Try refreshing the page first. If the problem persists, message the team manager or coach via the Messages tab, or reach out through your usual team channel. A screenshot of what you\'re seeing is always helpful.',
     order: 14,
+    visibleTo: ['player', 'coach', 'manager'],
   },
 ];

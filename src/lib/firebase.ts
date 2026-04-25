@@ -95,6 +95,7 @@ export interface FaqItem {
   question: string;
   answer: string;
   order: number;
+  visibleTo?: string[]; // 'player' | 'coach' | 'manager' — undefined means all
 }
 
 export interface AppUser {

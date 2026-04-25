@@ -143,11 +143,24 @@ export function MatchEditor({ games, onUpdate, onSaveGame, onAddGame, availabili
               onChange={(e) => setSelectedGameId(e.target.value)}
               className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-emjsc-navy outline-none"
             >
-              {games.map((g: any) => (
-                <option key={g.id} value={g.id}>
-                  {new Date(g.date).toLocaleDateString()} vs {g.opponent}
-                </option>
-              ))}
+              {(() => {
+                const now = new Date();
+                const upcoming = games.filter((g: any) => new Date(g.date) >= now).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                const completed = games.filter((g: any) => new Date(g.date) < now).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const fmt = (g: any) => `${new Date(g.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} vs ${g.opponent}`;
+                return (<>
+                  {upcoming.length > 0 && (
+                    <optgroup label="Upcoming">
+                      {upcoming.map((g: any) => <option key={g.id} value={g.id}>{fmt(g)}</option>)}
+                    </optgroup>
+                  )}
+                  {completed.length > 0 && (
+                    <optgroup label="Completed">
+                      {completed.map((g: any) => <option key={g.id} value={g.id}>{fmt(g)}</option>)}
+                    </optgroup>
+                  )}
+                </>);
+              })()}
             </select>
           </div>
 
