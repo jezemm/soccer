@@ -14,7 +14,6 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-// Format as Melbourne local time for use with TZID property
 function toLocal(d: Date): string {
   return (
     `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
@@ -22,7 +21,6 @@ function toLocal(d: Date): string {
   );
 }
 
-// UTC timestamp for DTSTAMP (must always be UTC per RFC 5545)
 function toUtcStamp(d: Date): string {
   return (
     `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
@@ -30,7 +28,8 @@ function toUtcStamp(d: Date): string {
   );
 }
 
-function escIcs(s: string) {
+// Escape ICS special chars; real newlines become \n (interpreted by calendar apps)
+function escIcs(s: string): string {
   return s
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
@@ -44,40 +43,100 @@ function splitOpponent(opponent: string) {
   return { club: opponent.slice(0, idx), team: opponent.slice(idx + 3) };
 }
 
+const DEFAULT_DUTIES = [
+  { id: "goalie", label: "Goalie", applicableTo: "both" },
+  { id: "snack_provider", label: "Snacks", applicableTo: "both" },
+  { id: "pitch_marshal", label: "Pitch Marshal", applicableTo: "home" },
+  { id: "referee", label: "Referee", applicableTo: "home" },
+];
+
+const LEGACY: Record<string, string> = {
+  goalie: "goalie",
+  snack_provider: "snackProvider",
+  pitch_marshal: "pitchMarshal",
+  referee: "referee",
+};
+
 export const fixturesICS = onRequest(
   { region: "australia-southeast1", cors: true },
   async (req, res) => {
     try {
       const db = getFirestore(DATABASE_ID);
-      const snap = await db
-        .collection("games")
-        .orderBy("date", "asc")
-        .get();
+
+      const [gamesSnap, dutiesSnap] = await Promise.all([
+        db.collection("games").orderBy("date", "asc").get(),
+        db.collection("dutiesConfig").get(),
+      ]);
+
+      // Build duty config: use Firestore dutiesConfig if available, else defaults
+      const duties =
+        dutiesSnap.empty
+          ? DEFAULT_DUTIES
+          : dutiesSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
 
       const now = toUtcStamp(new Date());
       const events: string[] = [];
 
-      snap.forEach((doc) => {
+      gamesSnap.forEach((doc) => {
         const g = doc.data();
         if (!g.date) return;
 
         const start = new Date(g.date);
         const end = new Date(start.getTime() + 60 * 60 * 1000);
-        const arrival = new Date(start.getTime() - 30 * 60 * 1000)
+        const arrivalTime = new Date(start.getTime() - 30 * 60 * 1000)
           .toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+        const kickoffTime = start.toLocaleTimeString("en-AU", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
         const { club, team } = splitOpponent(g.opponent || "");
         const opponentShort = club || team || g.opponent || "TBC";
-        const summary = escIcs(`EMJSC U8 vs ${opponentShort}`);
-        const desc = escIcs(
-          [
-            g.isHome ? "Home match" : "Away match",
-            `Arrive by ${arrival}`,
-            club && team ? `vs ${g.opponent}` : "",
-          ]
-            .filter(Boolean)
-            .join("\\n")
-        );
+
+        // Duties applicable to this game
+        const applicableDuties = duties.filter((d: any) => {
+          if (!d.applicableTo || d.applicableTo === "both") return true;
+          if (d.applicableTo === "home" && g.isHome) return true;
+          if (d.applicableTo === "away" && !g.isHome) return true;
+          return false;
+        });
+
+        const dutyLines = applicableDuties.map((d: any) => {
+          const assignee =
+            (g.assignments && g.assignments[d.id]) ||
+            (LEGACY[d.id] ? g[LEGACY[d.id]] : null) ||
+            null;
+          return `${d.label}: ${assignee || "Volunteer needed"}`;
+        });
+
+        // Build description lines using real newlines — escIcs converts to \n for ICS
+        const lines: string[] = [
+          `${g.isHome ? "🏠 Home Match" : "✈️ Away Match"}`,
+          `📍 ${g.location || "TBC"}`,
+          `⏰ Kick-off ${kickoffTime} · Arrive by ${arrivalTime}`,
+        ];
+
+        if (g.travelTimeMinutes) {
+          lines.push(`🚗 Travel time: ~${g.travelTimeMinutes} min`);
+        }
+
+        if (club && team) {
+          lines.push(`🆚 ${g.opponent}`);
+        }
+
+        if (dutyLines.length > 0) {
+          lines.push("");
+          lines.push("VOLUNTEER DUTIES");
+          lines.push(...dutyLines);
+        }
+
+        if (g.matchWrap) {
+          lines.push("");
+          lines.push("COACH NOTES");
+          lines.push(g.matchWrap);
+        }
+
+        const desc = escIcs(lines.join("\n"));
 
         events.push(
           [
@@ -86,7 +145,7 @@ export const fixturesICS = onRequest(
             `DTSTAMP:${now}`,
             `DTSTART;TZID=${TZID}:${toLocal(start)}`,
             `DTEND;TZID=${TZID}:${toLocal(end)}`,
-            `SUMMARY:${summary}`,
+            `SUMMARY:${escIcs(`EMJSC U8 vs ${opponentShort}`)}`,
             `LOCATION:${escIcs(g.location || "")}`,
             `DESCRIPTION:${desc}`,
             "END:VEVENT",
