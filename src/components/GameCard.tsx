@@ -102,9 +102,16 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           </div>
 
           {/* Opponent */}
-          <p className={`font-black text-emjsc-navy uppercase italic leading-tight ${compact ? 'text-base' : 'text-xl'}`}>
-            Vs {trimOpponentName(game.opponent)}
-          </p>
+          <div className="leading-tight">
+            <p className={`font-black text-emjsc-navy uppercase italic ${compact ? 'text-base' : 'text-xl'}`}>
+              Vs {trimOpponentName(game.opponent)}
+            </p>
+            {splitOpponent(game.opponent).team && (
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                {splitOpponent(game.opponent).team}
+              </p>
+            )}
+          </div>
 
           {/* Full venue address + navigate — next card only */}
           {!compact && rawLocation && (

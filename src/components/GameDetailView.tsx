@@ -202,6 +202,9 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             )}
             <div>
               <h3 className="text-4xl font-black text-slate-800 leading-none tracking-tight uppercase">Vs {trimOpponentName(game.opponent)}</h3>
+              {splitOpponent(game.opponent).team && (
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{splitOpponent(game.opponent).team}</p>
+              )}
             </div>
           </div>
           <div className="space-y-2">
