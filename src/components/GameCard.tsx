@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { MapPin, ArrowLeftRight, Zap, Users } from 'lucide-react';
 import { splitOpponent } from '../lib/constants';
 
-export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing }: any) {
+export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], availabilities = [], dutiesConfig = [], onSignUp, onToggleAvailability, isSyncing, dimmed = false }: any) {
   const date = new Date(game.date);
   const dateKey = game.date.split('T')[0];
   const isUnavailable = availabilities.some((a: any) => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
@@ -33,10 +33,10 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
 
   return (
     <motion.div
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className={`bg-white p-4 rounded-[1.75rem] shadow-sm border flex flex-col cursor-pointer transition-all gap-3 ${
-        isSwapPending ? 'border-orange-300 bg-orange-50/30' : isMissingDuties ? 'border-amber-200' : 'border-slate-200 hover:border-emjsc-navy'
+      whileTap={dimmed ? undefined : { scale: 0.98 }}
+      onClick={dimmed ? undefined : onClick}
+      className={`bg-white p-4 rounded-[1.75rem] shadow-sm border flex flex-col transition-all gap-3 ${
+        dimmed ? 'opacity-50 grayscale cursor-default' : `cursor-pointer ${isSwapPending ? 'border-orange-300 bg-orange-50/30' : isMissingDuties ? 'border-amber-200' : 'border-slate-200 hover:border-emjsc-navy'}`
       }`}
     >
       <div className="flex items-start justify-between gap-3">

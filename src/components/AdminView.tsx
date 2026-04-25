@@ -49,7 +49,6 @@ export function AdminView({
   onUpdateHomeGround,
   onRefreshTravelTimes,
   onBulkSync,
-  onSyncDribl,
   onClearSchedule,
   onDeleteGame,
   coachChild,

@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, 
@@ -57,6 +56,24 @@ import { AdminView } from './components/AdminView';
 import { ProfileView } from './components/ProfileView';
 import { MessagesView } from './components/MessagesView';
 
+let mapsLoader: Promise<void> | null = null;
+function loadGoogleMaps(apiKey: string): Promise<void> {
+  if (mapsLoader) return mapsLoader;
+  if ((window as any).google?.maps?.DistanceMatrixService) {
+    mapsLoader = Promise.resolve();
+    return mapsLoader;
+  }
+  mapsLoader = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    document.head.appendChild(script);
+  });
+  return mapsLoader;
+}
+
 export default function App() {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
   const [loading, setLoading] = useState(true);
@@ -67,6 +84,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('teamtrack_admin') === 'true');
   const [adminPass, setAdminPass] = useState('');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingLocation, setTrainingLocation] = useState('Gardiner Park');
   const [homeGround, setHomeGround] = useState('Central Park, Malvern VIC');
@@ -92,6 +110,11 @@ export default function App() {
   useEffect(() => {
     // No more auth listener, just check local storage on mount
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -921,32 +944,35 @@ export default function App() {
   };
 
   const syncTravelTime = async (gameId: string, location: string, kickOffDateStr: string) => {
-    if (!homeGround || !location) return;
-    
-    // Clean location to just the Park/Reserve name for better Google Maps accuracy
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!homeGround || !location || !apiKey) return null;
+
     const cleanLocation = location
       .split(/ Midi| Pitch| Field| Pavilion| Quarter| Half/i)[0]
       .trim();
 
-    // Calculate arrival time (30 mins before kick off) for traffic estimation
-    const kickOffDate = new Date(kickOffDateStr);
-    const arrivalDate = new Date(kickOffDate.getTime() - 30 * 60000);
-    const arrivalTimeIso = arrivalDate.toISOString();
+    const departureDate = new Date(new Date(kickOffDateStr).getTime() - 30 * 60000);
 
     try {
-      const response = await fetch('/api/travel-time', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origin: homeGround,
-          destination: cleanLocation,
-          arrivalTime: arrivalTimeIso
-        })
+      await loadGoogleMaps(apiKey);
+      const service = new (window as any).google.maps.DistanceMatrixService();
+      const result = await new Promise<any>((resolve, reject) => {
+        service.getDistanceMatrix({
+          origins: [homeGround],
+          destinations: [cleanLocation],
+          travelMode: 'DRIVING',
+          drivingOptions: { departureTime: departureDate, trafficModel: 'best_guess' },
+        }, (response: any, status: string) => {
+          if (status === 'OK') resolve(response);
+          else reject(new Error(status));
+        });
       });
-      const data = await response.json();
-      if (data.travelTimeMinutes) {
-        await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes: data.travelTimeMinutes });
-        return data.travelTimeMinutes;
+
+      const element = result.rows[0].elements[0];
+      if (element.status === 'OK') {
+        const travelTimeMinutes = Math.ceil(element.duration_in_traffic?.value ?? element.duration.value) / 60;
+        await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes });
+        return travelTimeMinutes;
       }
     } catch (err) {
       console.error("Auto sync travel error:", err);
@@ -1045,27 +1071,6 @@ export default function App() {
     }
   };
 
-  const handleSyncDribl = async () => {
-    if (!isAdmin) return;
-    setAdminActionStatus('Fetching from Dribl...');
-    try {
-      const response = await axios.get('/api/sync-fixtures', {
-        params: {
-          season: 'nPmrj2rmow',
-          club: '3pmvQzZrdv',
-          tenant: 'w8zdBWPmBX'
-        }
-      });
-      
-      if (response.data) {
-        await bulkSyncFixtures(response.data);
-      }
-    } catch (error: any) {
-      console.error("Dribl sync error:", error);
-      setAdminActionStatus('Dribl API Fetch Failed');
-      setTimeout(() => setAdminActionStatus(null), 5000);
-    }
-  };
 
   const refreshTravelTimes = async () => {
     if (!isAdmin || !homeGround) return;
@@ -1587,7 +1592,13 @@ export default function App() {
                       )}
 
                       {gamesLoaded && games.length > 0 && (() => {
-                        const game = games[0];
+                        const HOUR_MS = 60 * 60 * 1000;
+                        const activeGames = games.filter(g => now - new Date(g.date).getTime() < 2 * HOUR_MS);
+                        const completedGames = games.filter(g => now - new Date(g.date).getTime() >= 2 * HOUR_MS);
+                        const isInProgress = (g: GameType) => { const ms = now - new Date(g.date).getTime(); return ms >= HOUR_MS && ms < 2 * HOUR_MS; };
+
+                        if (activeGames.length === 0) return null;
+                        const game = activeGames[0];
                         const date = new Date(game.date);
                         const dateKey = game.date.split('T')[0];
                         const isUnavailable = availabilities.some(a => a.playerName === userName && a.dateKey === dateKey && a.isUnavailable);
@@ -1624,13 +1635,13 @@ export default function App() {
                         return (
                           <section className="space-y-4">
                             <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Next Match</h2>
-                            <div 
-                              onClick={() => { setSelectedGame(game); setView('game'); }}
-                              className="bg-white border-2 border-emjsc-navy rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group cursor-pointer hover:border-emjsc-red transition-all duration-300"
+                            <div
+                              onClick={isInProgress(game) ? undefined : () => { setSelectedGame(game); setView('game'); }}
+                              className={`bg-white border-2 border-emjsc-navy rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group transition-all duration-300 ${isInProgress(game) ? 'opacity-50 grayscale cursor-default' : 'cursor-pointer hover:border-emjsc-red'}`}
                             >
                               <div className="absolute top-0 right-0 bg-emjsc-navy text-white px-6 py-2 rounded-bl-3xl font-black uppercase tracking-tighter text-[9px] shadow-lg group-hover:bg-emjsc-red transition-colors flex items-center gap-2">
                                 <Zap className="w-3 h-3" />
-                                Upcoming
+                                {isInProgress(game) ? 'In Progress' : 'Upcoming'}
                               </div>
                               <div className="flex flex-col gap-6">
                                 <div className="space-y-3">
@@ -1756,35 +1767,66 @@ export default function App() {
                         );
                       })()}
 
-                      <section className="space-y-4">
-                        <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Match Fixture</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                          {!gamesLoaded ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3 col-span-full">
-                              <div className="w-8 h-8 rounded-full border-4 border-slate-100 border-t-emjsc-red animate-spin" />
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
-                            </div>
-                          ) : games.length === 0 ? (
-                            <EmptyState />
-                          ) : (
-                            games.slice(1).map((game) => (
-                              <GameCard
-                                key={game.id}
-                                game={game}
-                                userName={userName}
-                                homeGround={homeGround}
-                                feedbacks={feedbacks}
-                                availabilities={availabilities}
-                                dutiesConfig={dutiesConfig}
-                                onSignUp={handleSignUp}
-                                onToggleAvailability={handleToggleAvailability}
-                                isSyncing={isSyncing}
-                                onClick={() => { setSelectedGame(game); setView('game'); }}
-                              />
-                            ))
-                          )}
-                        </div>
-                      </section>
+                      {(() => {
+                        const HOUR_MS = 60 * 60 * 1000;
+                        const activeGames = games.filter((g: GameType) => now - new Date(g.date).getTime() < 2 * HOUR_MS);
+                        const completedGames = games.filter((g: GameType) => now - new Date(g.date).getTime() >= 2 * HOUR_MS);
+                        const isInProgress = (g: GameType) => { const ms = now - new Date(g.date).getTime(); return ms >= HOUR_MS && ms < 2 * HOUR_MS; };
+                        const upcomingFixtures = activeGames.slice(1);
+                        return (
+                          <>
+                            <section className="space-y-4">
+                              <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Match Fixture</h2>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+                                {!gamesLoaded ? (
+                                  <div className="flex flex-col items-center justify-center py-16 gap-3 col-span-full">
+                                    <div className="w-8 h-8 rounded-full border-4 border-slate-100 border-t-emjsc-red animate-spin" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading fixtures...</p>
+                                  </div>
+                                ) : games.length === 0 ? (
+                                  <EmptyState />
+                                ) : upcomingFixtures.length === 0 ? null : (
+                                  upcomingFixtures.map((game: GameType) => (
+                                    <GameCard
+                                      key={game.id}
+                                      game={game}
+                                      userName={userName}
+                                      homeGround={homeGround}
+                                      feedbacks={feedbacks}
+                                      availabilities={availabilities}
+                                      dutiesConfig={dutiesConfig}
+                                      onSignUp={handleSignUp}
+                                      onToggleAvailability={handleToggleAvailability}
+                                      isSyncing={isSyncing}
+                                      dimmed={isInProgress(game)}
+                                      onClick={() => { setSelectedGame(game); setView('game'); }}
+                                    />
+                                  ))
+                                )}
+                              </div>
+                            </section>
+                            {completedGames.length > 0 && (
+                              <section className="space-y-4">
+                                <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Completed Games</h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+                                  {completedGames.map((game: GameType) => (
+                                    <GameCard
+                                      key={game.id}
+                                      game={game}
+                                      userName={userName}
+                                      homeGround={homeGround}
+                                      feedbacks={feedbacks}
+                                      availabilities={availabilities}
+                                      dutiesConfig={dutiesConfig}
+                                      dimmed
+                                    />
+                                  ))}
+                                </div>
+                              </section>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="lg:col-span-4 space-y-6">
@@ -1962,7 +2004,6 @@ export default function App() {
                           onUpdateHomeGround={updateHomeGround}
                           onRefreshTravelTimes={refreshTravelTimes}
                           onBulkSync={bulkSyncFixtures}
-                          onSyncDribl={handleSyncDribl}
                           coachChild={coachChild}
                           onUpdateCoachChild={updateCoachChild}
                           coachExemptDuties={coachExemptDuties}
