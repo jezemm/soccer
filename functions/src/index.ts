@@ -44,7 +44,7 @@ function splitOpponent(opponent: string) {
 }
 
 function getVenueName(location: string): string {
-  const m = location.match(/^(.*?\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
+  const m = location.match(/^(.*\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
   if (m) return m[1].trim();
   return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, "").trim() || location;
 }

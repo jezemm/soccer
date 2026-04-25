@@ -208,7 +208,7 @@ export const CLUB_LOGO = "https://emjs.club/vic/sjsc/uploads/images/emjsc%20logo
 export const AVATAR_COLORS = ['#e31e24','#1a2e5a','#7c3aed','#16a34a','#d97706','#2563eb','#db2777','#0d9488','#ea580c','#0891b2'];
 
 export function getVenueName(location: string): string {
-  const m = location.match(/^(.*?\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
+  const m = location.match(/^(.*\b(?:Reserve|Park|Ground|Oval|Centre|Center|Stadium))\b/i);
   if (m) return m[1].trim();
   return location.replace(/\s+(?:Pitch|Field|Midi|Half|Court|\d).*$/i, '').trim() || location;
 }
