@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Navigation, ArrowLeftRight, Car, RefreshCw, Users, Home, MapPin } from 'lucide-react';
+import { Navigation, ArrowLeftRight, Car, RefreshCw, Users, Flag, User } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, getGameMapUrl, formatVenueDisplay, getVenueName, extractDestFromMapUrl } from '../lib/constants';
 
@@ -156,8 +156,8 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
           </div>
           <div className="flex flex-col items-end gap-1 mt-0.5">
             {game.travelTimeMinutes && (
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                <Home className="w-3 h-3 shrink-0" />
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400" title="Travel time from home ground">
+                <Flag className="w-3 h-3 shrink-0" />
                 <span>{game.travelTimeMinutes}m</span>
               </div>
             )}
@@ -166,8 +166,9 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                 <button
                   onClick={handleRequestTravel}
                   className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-emjsc-red active:scale-95 transition-all"
+                  title="Travel time from your location — tap to refresh"
                 >
-                  <MapPin className="w-3 h-3 shrink-0" />
+                  <User className="w-3 h-3 shrink-0" />
                   <span>{myTravelMins}m</span>
                 </button>
               ) : myTravelStatus === 'locating' ? (
@@ -178,9 +179,9 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                 <button
                   onClick={handleRequestTravel}
                   className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-slate-500 active:scale-95 transition-all"
-                  title="Get my travel time"
+                  title="Tap to get travel time from your location"
                 >
-                  <MapPin className="w-3 h-3 shrink-0" />
+                  <User className="w-3 h-3 shrink-0" />
                   <span>?m</span>
                 </button>
               )

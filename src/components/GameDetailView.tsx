@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car } from 'lucide-react';
+import { Calendar, Shield, Users, MapPin, Zap, Coffee, Star, Navigation, RefreshCw, Car, Flag, User } from 'lucide-react';
 import { FUNCTIONS_BASE } from '../lib/firebase';
 import { splitOpponent, sortCafes, getGameMapUrl, getVenueName, formatVenueDisplay, extractDestFromMapUrl } from '../lib/constants';
 import type { NearbyCafe, CafeSortMode } from '../lib/constants';
@@ -223,7 +223,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             </a>
             {!game.isHome && game.travelTimeMinutes && (
               <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
-                <Car className="w-4 h-4 text-emjsc-red" />
+                <Flag className="w-4 h-4 text-emjsc-red" title="Travel time from home ground" />
                 ~{game.travelTimeMinutes} min from home ground
               </p>
             )}
@@ -235,7 +235,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                     onClick={getMyTravelTime}
                     className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emjsc-navy bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors active:scale-95"
                   >
-                    <Car className="w-3.5 h-3.5 text-emjsc-red" />
+                    <User className="w-3.5 h-3.5 text-emjsc-red" />
                     {myTravelStatus === 'error' ? 'Try again' : 'Travel time from my location'}
                   </button>
                 ) : myTravelStatus === 'locating' || myTravelStatus === 'fetching' ? (
@@ -246,7 +246,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
                 ) : (
                   <div className="flex items-center gap-2">
                     <p className="text-slate-700 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
-                      <Car className="w-4 h-4 text-emjsc-red" />
+                      <User className="w-4 h-4 text-emjsc-red" />
                       ~{myTravelMinutes} min from your location
                     </p>
                     <button onClick={getMyTravelTime} className="p-1 rounded-lg hover:bg-slate-100 transition-colors" title="Refresh">
