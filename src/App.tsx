@@ -2038,7 +2038,7 @@ export default function App() {
                                   </button>
                                 ))}
                               </div>
-                              {userName && (
+                              {userName && !isAdmin && (
                                 <div className="flex rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0">
                                   <button onClick={() => setDutyFilter(f => !f)}
                                     className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors whitespace-nowrap ${dutyFilter ? 'bg-emjsc-red text-white' : 'text-slate-400 hover:text-slate-600'}`}>
