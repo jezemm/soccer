@@ -63,12 +63,16 @@ interface AvatarImageProps {
 }
 
 export function AvatarImage({ config, photoUrl, fallbackName, alt = 'Avatar', className = '' }: AvatarImageProps) {
-  const isJersey = config?.clotheType === 'EMJSCJersey';
+  const effectiveConfig: Partial<AvatarConfig> | null =
+    (config && Object.keys(config).length > 0) ? config
+    : fallbackName ? getDefaultAvatarConfig(fallbackName)
+    : null;
+
+  const isJersey = effectiveConfig?.clotheType === 'EMJSCJersey';
 
   const src: string = (() => {
-    if (config && Object.keys(config).length > 0) return getAvataaarsUrl(config);
+    if (effectiveConfig) return getAvataaarsUrl(effectiveConfig);
     if (photoUrl) return photoUrl;
-    if (fallbackName) return getAvataaarsUrl(getDefaultAvatarConfig(fallbackName));
     return '';
   })();
 
