@@ -50,9 +50,19 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
   // Auto-fetch if location permission already granted
   useEffect(() => {
     if (!travelDest || !game.isHome) return;
-    navigator.permissions?.query({ name: 'geolocation' as PermissionName })
-      .then(result => { if (result.state === 'granted') fetchMyTravel(); })
-      .catch(() => {});
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        .then(result => { if (result.state === 'granted') fetchMyTravel(); })
+        .catch(() => {});
+    } else {
+      // Safari: no Permissions API — call getCurrentPosition directly;
+      // returns immediately from cache if already granted, errors silently if not
+      navigator.geolocation.getCurrentPosition(
+        () => fetchMyTravel(),
+        () => {},
+        { timeout: 5000, maximumAge: 300000 }
+      );
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applicableDuties = (dutiesConfig.length > 0 ? dutiesConfig : [

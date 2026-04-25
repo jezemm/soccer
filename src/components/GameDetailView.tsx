@@ -136,9 +136,17 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
   // Auto-fetch if location permission already granted
   useEffect(() => {
     if (!travelDest) return;
-    navigator.permissions?.query({ name: 'geolocation' as PermissionName })
-      .then(result => { if (result.state === 'granted') getMyTravelTime(); })
-      .catch(() => {});
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        .then(result => { if (result.state === 'granted') getMyTravelTime(); })
+        .catch(() => {});
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        () => getMyTravelTime(),
+        () => {},
+        { timeout: 5000, maximumAge: 300000 }
+      );
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const arrivalTime = new Date(date.getTime() - 30 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
