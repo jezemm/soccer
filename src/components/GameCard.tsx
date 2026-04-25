@@ -106,6 +106,13 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
             {(() => { const { club, team } = splitOpponent(game.opponent); return <><p className="text-xl font-black text-emjsc-navy uppercase italic">Vs {club || team}</p>{club && team && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{team}</p>}</>; })()}
           </div>
 
+          {/* Full venue address */}
+          {rawLocation && (
+            <p className="text-[11px] font-medium text-slate-500 leading-snug">
+              {rawLocation}
+            </p>
+          )}
+
           {/* Navigate button */}
           <a
             href={getGameMapUrl(game)}
