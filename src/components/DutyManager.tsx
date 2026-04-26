@@ -129,11 +129,11 @@ export function DutyManager({
                   <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Icon (Emoji)</label>
                   <div className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-lg shrink-0">
-                      {editEmoji || <span className="text-slate-300 text-xs">?</span>}
+                      {editEmoji ? <span className="grayscale">{editEmoji}</span> : <span className="text-slate-300 text-xs">?</span>}
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {DUTY_EMOJIS.map(e => (
-                        <button key={e} onClick={() => setEditEmoji(editEmoji === e ? '' : e)} className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-all ${editEmoji === e ? 'bg-emjsc-navy/10 ring-2 ring-emjsc-navy scale-110' : 'bg-white border border-slate-200 hover:border-slate-400'}`}>{e}</button>
+                        <button key={e} onClick={() => setEditEmoji(editEmoji === e ? '' : e)} className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-all ${editEmoji === e ? 'bg-emjsc-navy/10 ring-2 ring-emjsc-navy scale-110' : 'bg-white border border-slate-200 hover:border-slate-400'}`}><span className="grayscale">{e}</span></button>
                       ))}
                     </div>
                   </div>
@@ -145,7 +145,7 @@ export function DutyManager({
               </div>
             ) : (
               <div key={d.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                {d.emoji && <span className="text-xl shrink-0">{d.emoji}</span>}
+                {d.emoji && <span className="text-xl shrink-0 grayscale">{d.emoji}</span>}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-emjsc-navy truncate">{d.label}</p>
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
@@ -189,11 +189,11 @@ export function DutyManager({
           </div>
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-lg shrink-0">
-              {newEmoji || <span className="text-slate-300 text-xs">?</span>}
+              {newEmoji ? <span className="grayscale">{newEmoji}</span> : <span className="text-slate-300 text-xs">?</span>}
             </div>
             <div className="flex flex-wrap gap-1 flex-1">
               {DUTY_EMOJIS.map(e => (
-                <button key={e} onClick={() => setNewEmoji(newEmoji === e ? '' : e)} className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-all ${newEmoji === e ? 'bg-emjsc-navy/10 ring-2 ring-emjsc-navy scale-110' : 'bg-white border border-slate-200 hover:border-slate-400'}`}>{e}</button>
+                <button key={e} onClick={() => setNewEmoji(newEmoji === e ? '' : e)} className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-all ${newEmoji === e ? 'bg-emjsc-navy/10 ring-2 ring-emjsc-navy scale-110' : 'bg-white border border-slate-200 hover:border-slate-400'}`}><span className="grayscale">{e}</span></button>
               ))}
             </div>
           </div>

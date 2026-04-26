@@ -235,7 +235,7 @@ export function GameCard({ game, onClick, userName, homeGround, feedbacks = [], 
                             : 'bg-orange-50 border-orange-200 ring-1 ring-orange-300 active:scale-95'
                   } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                 >
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5 truncate">{duty.emoji && <span className="mr-0.5">{duty.emoji}</span>}{duty.label}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5 truncate">{duty.emoji && <span className="mr-0.5 grayscale">{duty.emoji}</span>}{duty.label}</p>
                   <p className={`text-xs font-black uppercase truncate ${
                     isMe ? (swap ? 'text-orange-600' : 'text-emjsc-red')
                       : swap ? 'text-orange-600'
