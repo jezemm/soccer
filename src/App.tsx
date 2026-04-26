@@ -1766,10 +1766,9 @@ export default function App() {
                   className="w-8 h-8 object-contain"
                   referrerPolicy="no-referrer"
                 />
-                <div>
-                  <h1 className="text-sm font-black tracking-tight text-emjsc-navy leading-none uppercase">
-                    {view === 'fixtures' ? 'Fixture' : view === 'squad' ? 'Squad' : view === 'admin' ? 'Admin' : view === 'messages' ? 'Messages' : view === 'game' ? 'Match' : 'Hub'}
-                  </h1>
+                <div className="text-left">
+                  <h1 className="text-sm font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
+                  {appTeamDisplay && <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-0.5">{appTeamDisplay}</p>}
                 </div>
               </button>
               
