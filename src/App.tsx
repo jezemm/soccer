@@ -598,7 +598,7 @@ export default function App() {
     if (!isAdmin) return;
     try {
       const newRef = doc(collection(db, 'announcements'));
-      const data: any = { content, type, timestamp: serverTimestamp() };
+      const data: any = { content, type, timestamp: serverTimestamp(), author: userName || '' };
       if (targetPlayer) data.targetPlayer = targetPlayer;
       await setDoc(newRef, data);
     } catch (err: any) {
@@ -1942,9 +1942,14 @@ export default function App() {
                                         {ann.timestamp?.toDate ? ann.timestamp.toDate().toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : 'Posted Recently'}
                                       </span>
                                     </div>
-                                    <p className="text-sm font-bold leading-relaxed italic uppercase tracking-tight">
+                                    <p className="text-sm font-semibold leading-relaxed whitespace-pre-wrap">
                                       {ann.content}
                                     </p>
+                                    {(ann.author || staffAccounts.find((a: any) => a.role === 'coach')?.name) && (
+                                      <p className="text-[11px] font-bold opacity-60 text-right mt-1">
+                                        — {ann.author || staffAccounts.find((a: any) => a.role === 'coach')?.name}
+                                      </p>
+                                    )}
                                   </div>
                                   <Zap className={`absolute -bottom-2 -right-2 w-16 h-16 opacity-[0.03] group-hover:scale-110 transition-transform ${
                                     ann.type === 'goal' ? 'text-amber-900' : ann.type === 'player_feedback' ? 'text-emerald-900' : 'text-indigo-900'

@@ -72,6 +72,7 @@ export interface Announcement {
   content: string;
   type: 'message' | 'goal' | 'player_feedback';
   targetPlayer?: string;
+  author?: string;
   timestamp: any;
 }
 
