@@ -136,6 +136,7 @@ export default function App() {
   const [dutyFilter, setDutyFilter] = useState(false);
   const [calendarVersion, setCalendarVersion] = useState(0);
   const [calendarUpdatedAt, setCalendarUpdatedAt] = useState<Date | null>(null);
+  const calendarCardRef = useRef<HTMLDivElement>(null);
   const [driblCache, setDriblCache] = useState<import('./components/AdminView').DriblCache | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingSchedule, setTrainingSchedule] = useState<TrainingSession[]>([]);
@@ -2116,9 +2117,18 @@ export default function App() {
                               )}
                             </div>
                             <section className="space-y-4">
-                              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                Match Fixture{anyFilterActive ? ` · ${fixtureGames.length} result${fixtureGames.length !== 1 ? 's' : ''}` : ''}
-                              </h2>
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                  Match Fixture{anyFilterActive ? ` · ${fixtureGames.length} result${fixtureGames.length !== 1 ? 's' : ''}` : ''}
+                                </h2>
+                                <button
+                                  onClick={() => calendarCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                  className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-emjsc-red transition-colors"
+                                >
+                                  <CalendarDays className="w-3 h-3" />
+                                  Add to calendar
+                                </button>
+                              </div>
                               <div className="flex flex-col gap-4">
                                 {!gamesLoaded ? (
                                   <div className="flex flex-col items-center justify-center py-16 gap-3 w-full">
@@ -2242,7 +2252,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div ref={calendarCardRef} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
                           <CalendarDays className="w-3.5 h-3.5 text-emjsc-red" />
                           Subscribe to Calendar
@@ -2285,7 +2295,7 @@ export default function App() {
                           </div>
                         </div>
                         <p className="text-[9px] text-slate-400 font-medium italic">
-                          Note: some calendar apps can take up to 24 hours to show new events after subscribing.
+                          Note: some calendar apps can take up to 24 hours to show new or updated event information after subscribing.
                         </p>
                       </div>
                     </div>
@@ -2669,7 +2679,7 @@ export default function App() {
                 )}
 
                 {view === 'admin' && (
-                  <div className="max-w-4xl mx-auto">
+                  <div>
                     <Suspense fallback={null}>
                         <AdminView
                           userName={userName}
