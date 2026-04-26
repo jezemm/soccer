@@ -593,7 +593,8 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
     if (cachedEntry) {
       const ourTeams = cachedEntry.allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
       const fallbackTeam = ourTeams[0] ?? cachedEntry.allTeams[0] ?? '';
-      const savedTeam = driblCache?.selectedTeam;
+      const cacheMatchesCurrentSelection = driblCache?.competition?.id === competition.id && driblCache?.club?.id === club.id;
+      const savedTeam = cacheMatchesCurrentSelection ? driblCache?.selectedTeam : null;
       const firstTeam = (savedTeam && cachedEntry.allTeams.includes(savedTeam)) ? savedTeam : fallbackTeam;
       setPhase({ tag: 'preview', competition, club, allFixtures: cachedEntry.fixtures, allTeams: cachedEntry.allTeams, selectedTeamClub: extractClubName(firstTeam), selectedTeam: firstTeam, cachedAt: cachedEntry.scrapedAt });
       return;
@@ -615,7 +616,8 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
       const allTeams = Array.from(teamSet).sort();
       const ourTeams = allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
       const fallbackTeam = ourTeams[0] ?? allTeams[0] ?? '';
-      const savedTeam = driblCache?.selectedTeam;
+      const cacheMatchesCurrentSelection = driblCache?.competition?.id === competition.id && driblCache?.club?.id === club.id;
+      const savedTeam = cacheMatchesCurrentSelection ? driblCache?.selectedTeam : null;
       const firstTeam = (savedTeam && allTeams.includes(savedTeam)) ? savedTeam : fallbackTeam;
       const selectedTeamClub = extractClubName(firstTeam);
       const scrapedAt = new Date().toISOString();
@@ -637,6 +639,8 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
       await onConfirmSync(allFixtures, selectedTeam, teamLogo);
       await onSaveDriblCache({
         ...(driblCache ?? { fixtures: [], allTeams: [], selectedTeam: '', savedAt: new Date().toISOString() }),
+        competition,
+        club,
         selectedTeam,
         selectedClub: selectedTeamClub,
       });
@@ -861,12 +865,12 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
       {/* Team selector */}
       <div className="space-y-2">
         <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Select your team</p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {teamLogo && <img src={teamLogo} alt="" className="w-8 h-8 object-contain rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
           <select
             value={selectedTeam}
             onChange={e => setPhase({ ...phase, selectedTeam: e.target.value, savedCount: undefined })}
-            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
+            className="flex-1 min-w-0 max-w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
           >
             {(clubTeams.length > 0 ? clubTeams : allTeams).map(t => (
               <option key={t} value={t}>{teamWithinClubName(t, selectedTeamClub)}</option>

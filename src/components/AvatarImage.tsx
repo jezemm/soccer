@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useRef, useState, useEffect } from 'react';
 import { AvatarConfig, getAvataaarsUrl, getDefaultAvatarConfig } from '../lib/constants';
 
 // Shirt path in SVG coordinate space (264×280 viewBox).
@@ -76,13 +76,31 @@ export function AvatarImage({ config, photoUrl, fallbackName, alt = 'Avatar', cl
     return '';
   })();
 
+  const [loadedSrc, setLoadedSrc] = useState('');
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Handle already-cached images that won't fire onLoad
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setLoadedSrc(src);
+    }
+  }, [src]);
+
   if (!src) return null;
 
   if (isJersey) {
+    const ready = loadedSrc === src;
     return (
       <div className={`relative inline-block overflow-hidden ${className}`} style={{ lineHeight: 0 }}>
-        <img src={src} alt={alt} className="w-full h-full" />
-        <JerseyOverlay />
+        <img
+          ref={imgRef}
+          src={src}
+          alt={alt}
+          className={`w-full h-full transition-opacity duration-150 ${ready ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setLoadedSrc(src)}
+        />
+        {ready && <JerseyOverlay />}
       </div>
     );
   }
