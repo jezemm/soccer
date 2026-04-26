@@ -403,7 +403,13 @@ export const scrapeDribl = onRequest(
       // Normalise to flat fixture objects — the API wraps fields in an
       // "attributes" key; flatten so the admin panel's team-name checks work.
       const raw: any[] = data.data || data.fixtures || (Array.isArray(data) ? data : []);
-      const fixtures = raw.map((f: any) => (f.attributes ? { ...f.attributes, id: f.id } : f));
+      const fixtures = raw.map((f: any) => {
+        const flat = f.attributes ? { ...f.attributes, id: f.id } : { ...f };
+        // Normalise logo field names to match what the app expects
+        if (!flat.home_team_logo && flat.home_logo) flat.home_team_logo = flat.home_logo;
+        if (!flat.away_team_logo && flat.away_logo) flat.away_team_logo = flat.away_logo;
+        return flat;
+      });
 
       res.status(200).json({
         fixtures,

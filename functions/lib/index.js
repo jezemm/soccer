@@ -335,7 +335,15 @@ exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", c
         // Normalise to flat fixture objects — the API wraps fields in an
         // "attributes" key; flatten so the admin panel's team-name checks work.
         const raw = data.data || data.fixtures || (Array.isArray(data) ? data : []);
-        const fixtures = raw.map((f) => (f.attributes ? Object.assign(Object.assign({}, f.attributes), { id: f.id }) : f));
+        const fixtures = raw.map((f) => {
+            const flat = f.attributes ? Object.assign(Object.assign({}, f.attributes), { id: f.id }) : Object.assign({}, f);
+            // Normalise logo field names to match what the app expects
+            if (!flat.home_team_logo && flat.home_logo)
+                flat.home_team_logo = flat.home_logo;
+            if (!flat.away_team_logo && flat.away_logo)
+                flat.away_team_logo = flat.away_logo;
+            return flat;
+        });
         res.status(200).json({
             fixtures,
             debug: { source: "dribl-api", count: fixtures.length },
