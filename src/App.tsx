@@ -2246,14 +2246,15 @@ export default function App() {
                       const isEditingAv = editingAvatar;
                       const isEditingBio = editingSkills !== null;
                       return (
-                        <div className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
+                        <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 relative overflow-hidden space-y-4">
+                          <div className="absolute inset-x-0 top-0 h-1.5 bg-emjsc-red rounded-t-3xl" />
                           <div className="flex items-center gap-4">
                             <div className="relative shrink-0 w-20 h-20">
                               <AvatarImage config={myAvatarConfig} photoUrl={myPhotoUrl} fallbackName={myName} alt={myName} className="w-20 h-20 rounded-2xl" />
                               {!isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
-                                  className="absolute bottom-0.5 right-0.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-white hover:text-emjsc-navy"
+                                  className="absolute bottom-0.5 right-0.5 bg-emjsc-red text-white p-1.5 rounded-lg shadow active:scale-95 transition-all hover:bg-emjsc-navy"
                                 >
                                   <PencilIcon className="w-3 h-3" />
                                 </button>
@@ -2261,21 +2262,19 @@ export default function App() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-xl font-black text-white tracking-tighter uppercase">{myName}</p>
-                                <span className="text-[8px] font-black uppercase bg-white/20 text-white px-1.5 py-0.5 rounded shrink-0">You</span>
-                                {myRole && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0 capitalize">{myRole}</span>}
+                                <p className="text-xl font-black text-slate-900 tracking-tighter uppercase">{myName}</p>
+                                <span className="text-[8px] font-black uppercase bg-emjsc-red/10 text-emjsc-red border border-emjsc-red/20 px-1.5 py-0.5 rounded shrink-0">You</span>
+                                {myRole && <span className="text-[8px] font-black uppercase bg-emjsc-navy text-white px-1.5 py-0.5 rounded shrink-0 capitalize">{myRole}</span>}
                               </div>
-                              <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-0.5">Your Profile</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Your Profile</p>
                             </div>
                           </div>
                           {isEditingAv ? (
-                            <div className="bg-white rounded-2xl p-4">
-                              <AvatarEditor
-                                initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(myName)}
-                                onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
-                                onCancel={() => setEditingAvatar(false)}
-                              />
-                            </div>
+                            <AvatarEditor
+                              initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(myName)}
+                              onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
+                              onCancel={() => setEditingAvatar(false)}
+                            />
                           ) : isEditingBio ? (
                             <div className="space-y-2">
                               <textarea
@@ -2283,18 +2282,18 @@ export default function App() {
                                 value={editingSkills}
                                 onChange={(e) => setEditingSkills(e.target.value)}
                                 placeholder={myRole ? "Describe yourself — your role, background, or anything you'd like the team to know..." : "Describe your skills, favourite position, or what you're working on..."}
-                                className="w-full h-24 p-3 bg-white/10 border border-white/20 rounded-xl text-[10px] font-bold text-white focus:ring-2 focus:ring-white outline-none resize-none placeholder:text-white/30"
+                                className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-emjsc-red outline-none resize-none placeholder:text-slate-300"
                               />
                               <div className="flex gap-2">
-                                <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white/10 text-white/70 rounded-xl active:scale-95 transition-all">Cancel</button>
-                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(myName)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
+                                <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-xl active:scale-95 transition-all">Cancel</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(myName)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white rounded-xl active:scale-95 transition-all">Save</button>
                               </div>
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              <p className="text-[10px] font-bold text-white/80 leading-relaxed italic">"{bio}"</p>
+                              <p className="text-[10px] font-bold text-slate-600 leading-relaxed italic">"{bio}"</p>
                               <div className="flex gap-2 flex-wrap">
-                                <button onClick={() => { setEditingSkills(bio); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-white/60 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-95">
+                                <button onClick={() => { setEditingSkills(bio); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-slate-500 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-all active:scale-95">
                                   Edit Bio
                                 </button>
                               </div>
@@ -2306,7 +2305,6 @@ export default function App() {
                               onSave={(next) => updatePlayerPassword(myName, next)}
                             />
                           )}
-                          <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
                         </div>
                       );
                     })()}
@@ -2374,7 +2372,6 @@ export default function App() {
                               )}
                             </div>
                           )}
-                          <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
                         </div>
                       );
                     })}
