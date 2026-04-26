@@ -313,50 +313,37 @@ exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", c
     }
 });
 const DRIBL_TENANT = "w8zdBWPmBX";
-const DRIBL_SEASON = "nPmrj2rmow";
-const DRIBL_CLUB = "3pmvQzZrdv";
-exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public", timeoutSeconds: 60 }, async (_req, res) => {
+exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public" }, async (req, res) => {
     try {
-        const params = new URLSearchParams({
-            date_range: "default",
-            season: DRIBL_SEASON,
-            club: DRIBL_CLUB,
-            tenant: DRIBL_TENANT,
-            timezone: "Australia/Melbourne",
-        });
-        const upstream = await fetch(`https://mc-api.dribl.com/api/fixtures?${params.toString()}`, {
+        const url = `https://mc-api.dribl.com/api/fixtures?` +
+            `date_range=default&season=nPmrj2rmow&club=3pmvQzZrdv` +
+            `&tenant=${DRIBL_TENANT}&timezone=Australia%2FMelbourne`;
+        const response = await fetch(url, {
             headers: {
                 Accept: "application/json",
                 "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
                 "X-Tenant": DRIBL_TENANT,
             },
         });
-        if (!upstream.ok) {
-            throw new Error(`Dribl API returned HTTP ${upstream.status}`);
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            console.error("Dribl API error:", response.status, text.slice(0, 200));
+            res.status(502).json({ error: `Dribl API returned ${response.status}` });
+            return;
         }
-        const data = await upstream.json();
-        // Dribl API returns { data: [...] } in JSON:API style; fall back to plain arrays
+        const data = await response.json();
+        // Normalise to flat fixture objects — the API wraps fields in an
+        // "attributes" key; flatten so the admin panel's team-name checks work.
         const raw = data.data || data.fixtures || (Array.isArray(data) ? data : []);
-        const fixtures = raw.map((f) => {
-            const a = f.attributes || f;
-            return {
-                round: a.round || a.full_round || null,
-                date: a.date || null,
-                time: a.time || a.start_time || null,
-                home_team_name: a.home_team_name || a.home_team || null,
-                away_team_name: a.away_team_name || a.away_team || null,
-                home_team_logo: a.home_team_logo || a.home_logo || null,
-                away_team_logo: a.away_team_logo || a.away_logo || null,
-                venue: a.venue || a.ground_name || null,
-                field_name: a.field_name || null,
-                map_url: a.map_url || null,
-            };
+        const fixtures = raw.map((f) => (f.attributes ? Object.assign(Object.assign({}, f.attributes), { id: f.id }) : f));
+        res.status(200).json({
+            fixtures,
+            debug: { source: "dribl-api", count: fixtures.length },
         });
-        res.status(200).json({ fixtures, debug: { total: raw.length, source: "mc-api.dribl.com" } });
     }
     catch (err) {
         console.error("scrapeDribl error:", err);
-        res.status(500).json({ error: err.message || "Unknown error", fixtures: [] });
+        res.status(500).json({ error: err.message || "Failed to fetch from Dribl" });
     }
 });
 //# sourceMappingURL=index.js.map

@@ -371,3 +371,47 @@ export const cafesNearby = onRequest(
     }
   }
 );
+
+const DRIBL_TENANT = "w8zdBWPmBX";
+
+export const scrapeDribl = onRequest(
+  { region: "australia-southeast1", cors: true, invoker: "public" },
+  async (req, res) => {
+    try {
+      const url =
+        `https://mc-api.dribl.com/api/fixtures?` +
+        `date_range=default&season=nPmrj2rmow&club=3pmvQzZrdv` +
+        `&tenant=${DRIBL_TENANT}&timezone=Australia%2FMelbourne`;
+
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
+          "X-Tenant": DRIBL_TENANT,
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error("Dribl API error:", response.status, text.slice(0, 200));
+        res.status(502).json({ error: `Dribl API returned ${response.status}` });
+        return;
+      }
+
+      const data = await response.json();
+
+      // Normalise to flat fixture objects — the API wraps fields in an
+      // "attributes" key; flatten so the admin panel's team-name checks work.
+      const raw: any[] = data.data || data.fixtures || (Array.isArray(data) ? data : []);
+      const fixtures = raw.map((f: any) => (f.attributes ? { ...f.attributes, id: f.id } : f));
+
+      res.status(200).json({
+        fixtures,
+        debug: { source: "dribl-api", count: fixtures.length },
+      });
+    } catch (err: any) {
+      console.error("scrapeDribl error:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch from Dribl" });
+    }
+  }
+);
