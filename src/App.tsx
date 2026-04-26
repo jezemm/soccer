@@ -1756,7 +1756,7 @@ export default function App() {
           </div>
         </aside>
 
-        <div className="flex-1 w-full relative">
+        <div className="flex-1 min-w-0 relative overflow-x-hidden">
           {/* Mobile Header (Hidden on Desktop) */}
           <header className="md:hidden bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-[60]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
             <div className="flex items-center justify-between">
@@ -2295,7 +2295,7 @@ export default function App() {
                           </div>
                         </div>
                         <p className="text-[9px] text-slate-400 font-medium italic">
-                          Note: some calendar apps can take up to 24 hours to show new or updated event information after subscribing.
+                          Note: some calendar apps can take up to 24 hours to show new or updated event information.
                         </p>
                       </div>
                     </div>
