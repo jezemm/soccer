@@ -1454,7 +1454,7 @@ export default function App() {
   if (!userName) {
     return (
       <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
-        <div className="absolute top-6 right-6">
+        <div className="absolute right-6" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
           <button
             onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); }}
             className="flex items-center gap-1.5 px-3 py-2 text-white bg-emjsc-navy rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
