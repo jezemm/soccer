@@ -258,7 +258,8 @@ export default function App() {
           selectedClub: data.selectedClub || '',
           selectedTeam: data.selectedTeam || '',
           savedAt: data.savedAt || new Date().toISOString(),
-          competitionUrl: data.competitionUrl || '',
+          competition: data.competition || undefined,
+          club: data.club || undefined,
         });
       }
     });
@@ -1360,6 +1361,24 @@ export default function App() {
   };
 
 
+  const fetchDriblCompetitions = async (): Promise<{ competitions: import('./components/AdminView').DriblCompetition[] }> => {
+    const res = await fetch('/api/dribl/competitions');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  };
+
+  const fetchDriblClubs = async (competitionId: string, season: string): Promise<{ clubs: import('./components/AdminView').DriblClub[] }> => {
+    const res = await fetch(`/api/dribl/clubs?competition=${encodeURIComponent(competitionId)}&season=${encodeURIComponent(season)}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  };
+
   const fetchDriblFixtures = async (url: string): Promise<{ fixtures: any[]; debug: any } | null> => {
     if (!isAdmin) return null;
     try {
@@ -1391,7 +1410,8 @@ export default function App() {
         selectedClub: cache.selectedClub || '',
         selectedTeam: cache.selectedTeam,
         savedAt: cache.savedAt,
-        competitionUrl: cache.competitionUrl || '',
+        competition: cache.competition || null,
+        club: cache.club || null,
       });
     } catch (err) {
       console.error('saveDriblCache error:', err);
@@ -2652,6 +2672,8 @@ export default function App() {
                           teamLogoUrl={teamLogoUrl}
                           onUpdateTeamLogoUrl={updateTeamLogoUrl}
                           onBulkSync={bulkSyncFixtures}
+                          onFetchCompetitions={fetchDriblCompetitions}
+                          onFetchClubs={fetchDriblClubs}
                           onFetchDribl={fetchDriblFixtures}
                           onConfirmSync={confirmSyncFixtures}
                           driblCache={driblCache}

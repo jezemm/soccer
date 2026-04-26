@@ -63,6 +63,55 @@ async function startServer() {
     }
   });
 
+  const DRIBL_HEADERS = {
+    'Accept': 'application/json',
+    'User-Agent': 'Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)',
+    'X-Tenant': 'w8zdBWPmBX',
+  };
+
+  // Dribl API — competitions for the FV tenant (optionally filtered by season)
+  app.get('/api/dribl/competitions', async (req, res) => {
+    const season = (req.query.season as string) || '';
+    try {
+      const r = await axios.get('https://mc-api.dribl.com/api/competitions', {
+        params: { tenant: 'w8zdBWPmBX', ...(season ? { season } : {}) },
+        headers: DRIBL_HEADERS,
+        timeout: 10_000,
+      });
+      const raw: any[] = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.competitions ?? []);
+      res.json({
+        competitions: raw.map((c: any) => ({
+          id: String(c.id ?? c.competition_id ?? ''),
+          name: String(c.name ?? c.competition_name ?? c.short_name ?? ''),
+          season: String(c.season_id ?? c.season ?? season),
+        })),
+      });
+    } catch (e: any) {
+      res.status(502).json({ error: `Competitions API returned ${e.response?.status ?? e.message}` });
+    }
+  });
+
+  // Dribl API — clubs for a competition
+  app.get('/api/dribl/clubs', async (req, res) => {
+    const { season = '', competition = '' } = req.query as Record<string, string>;
+    try {
+      const r = await axios.get('https://mc-api.dribl.com/api/clubs', {
+        params: { tenant: 'w8zdBWPmBX', season, competition },
+        headers: DRIBL_HEADERS,
+        timeout: 10_000,
+      });
+      const raw: any[] = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.clubs ?? []);
+      res.json({
+        clubs: raw.map((c: any) => ({
+          id: String(c.id ?? c.club_id ?? ''),
+          name: String(c.name ?? c.club_name ?? c.short_name ?? ''),
+        })),
+      });
+    } catch (e: any) {
+      res.status(502).json({ error: `Clubs API returned ${e.response?.status ?? e.message}` });
+    }
+  });
+
   // Playwright scraper for Dribl fixture page (logos + map links).
   // Spawns a child Node process to avoid ESM/tsx dynamic-import issues.
   app.get("/api/scrape-dribl", (req, res) => {
