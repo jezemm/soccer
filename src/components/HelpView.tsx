@@ -311,14 +311,23 @@ export function FaqManager({ items = [], onAdd, onUpdate, onDelete, onReset }: a
   );
 }
 
-export function HelpView({ faqItems = [], userRole, isAdmin, onShowTerms }: any) {
+export function HelpView({ faqItems = [], globalFaqItems = [], userRole, isAdmin, onShowTerms }: any) {
   const [open, setOpen] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const toggle = (id: string) => setOpen(o => o === id ? null : id);
 
   const viewerRole = isAdmin ? (userRole || 'manager') : 'player';
 
-  const source = (faqItems as FaqItem[]).length > 0 ? (faqItems as FaqItem[]) : SEED_FAQS as any[];
+  // Merge: global FAQ is the base; team-specific items override by ID or append
+  const teamFaq = faqItems as FaqItem[];
+  const globalFaq = globalFaqItems as FaqItem[];
+  const merged: FaqItem[] = globalFaq.length > 0
+    ? [
+        ...globalFaq.filter((g: FaqItem) => !teamFaq.find((t: FaqItem) => t.id === g.id)),
+        ...teamFaq,
+      ].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : teamFaq;
+  const source = merged.length > 0 ? merged : SEED_FAQS as any[];
   const faqs = source
     .filter((i: any) => {
       const vis: string[] = i.visibleTo || ALL_ROLES;

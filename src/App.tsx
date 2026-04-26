@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings, TrainingSession } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
+import { useTeamDb } from './lib/teamDb';
 import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig } from './lib/constants';
 import { AvatarEditor } from './components/AvatarEditor';
 import { AvatarImage } from './components/AvatarImage';
@@ -91,6 +92,7 @@ function ChangePasswordForm({ playerName, onSave }: { playerName: string; onSave
 }
 
 export default function App() {
+  const { teamPath, ctx: teamCtx, teamCollection: TC, teamDoc: TD, settingsDoc: SD } = useTeamDb();
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
   const [loading, setLoading] = useState(true);
   const [gamesLoaded, setGamesLoaded] = useState(false);
@@ -156,6 +158,7 @@ export default function App() {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [dutiesConfig, setDutiesConfig] = useState<DutyConfig[]>([]);
   const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
+  const [globalFaqItems, setGlobalFaqItems] = useState<FaqItem[]>([]);
   const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({ adminEmail: 'jeremymarks@gmail.com' });
   const [showFeatureModal, setShowFeatureModal] = useState(false);
@@ -179,7 +182,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'games'), orderBy('date', 'asc'));
+    const q = query(TC('games'), orderBy('date', 'asc'));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -190,10 +193,10 @@ export default function App() {
       () => setGamesLoaded(true)
     );
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'profiles'), (snapshot) => {
+    const unsubscribe = onSnapshot(TC('profiles'), (snapshot) => {
       const p: Record<string, any> = {};
       snapshot.forEach(doc => {
         p[doc.id] = doc.data();
@@ -201,9 +204,9 @@ export default function App() {
       setProfiles(p);
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'training'), (snapshot) => {
+    const unsubscribe = onSnapshot(SD('training'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setTrainingCancelled(data.trainingCancelled);
@@ -217,7 +220,7 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requestUserLocation = () => {
     navigator.geolocation.getCurrentPosition(
@@ -238,7 +241,7 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'calendar'), (snapshot) => {
+    const unsubscribe = onSnapshot(SD('calendar'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setCalendarVersion(data.version || 0);
@@ -246,10 +249,10 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'driblCache'), (snapshot) => {
+    const unsubscribe = onSnapshot(SD('driblCache'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setDriblCache({
@@ -261,19 +264,19 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'feedback'), (snapshot) => {
+    const unsubscribe = onSnapshot(TC('feedback'), (snapshot) => {
       const f = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlayerFeedback));
       setFeedbacks(f);
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'messages'),
+      TC('messages'),
       (snapshot) => {
         const m = snapshot.docs
           .map(d => ({ id: d.id, ...d.data() } as Message))
@@ -283,19 +286,19 @@ export default function App() {
       (err) => console.error('Messages subscription error:', err)
     );
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'blocks'), (snapshot) => {
+    const unsubscribe = onSnapshot(TC('blocks'), (snapshot) => {
       const b = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Block));
       setBlocks(b);
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'announcements'),
+      TC('announcements'),
       (snapshot) => {
         const a = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
@@ -305,27 +308,27 @@ export default function App() {
       (err) => console.error('Announcements subscription error:', err)
     );
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'availabilities'), (snapshot) => {
+    const unsubscribe = onSnapshot(TC('availabilities'), (snapshot) => {
       const a = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Availability));
       setAvailabilities(a);
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'dutiesConfig'), (snapshot) => {
+    const unsubscribe = onSnapshot(TC('dutiesConfig'), (snapshot) => {
       const d = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DutyConfig));
       setDutiesConfig(d);
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'faq'),
+      TC('faq'),
       (snapshot) => {
         const f = snapshot.docs
           .map(d => ({ id: d.id, ...d.data() } as FaqItem))
@@ -335,11 +338,27 @@ export default function App() {
       (err) => console.error('FAQ subscription error:', err)
     );
     return () => unsubscribe();
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Global FAQ from super admin — available to all team hubs
+  useEffect(() => {
+    const { globalCollection: GC } = { globalCollection: (name: string) => collection(db, `global/${name}`) };
+    const unsubscribe = onSnapshot(
+      GC('faq'),
+      (snapshot) => {
+        const f = snapshot.docs
+          .map(d => ({ id: d.id, ...d.data() } as FaqItem))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        setGlobalFaqItems(f);
+      },
+      () => {} // silently ignore if global/faq doesn't exist yet
+    );
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'featureRequests'),
+      TC('featureRequests'),
       (snapshot) => {
         const r = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FeatureRequest));
         setFeatureRequests(r);
@@ -347,19 +366,19 @@ export default function App() {
       (err) => console.error('Feature requests subscription error:', err)
     );
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'notifications'), (snapshot) => {
+    const unsubscribe = onSnapshot(SD('notifications'), (snapshot) => {
       if (snapshot.exists()) {
         setNotificationSettings(snapshot.data() as NotificationSettings);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'passwords'), (snapshot) => {
+    const unsubscribe = onSnapshot(SD('passwords'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setPasswords(prev => ({
@@ -371,10 +390,10 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const unsubSquad = onSnapshot(doc(db, 'settings', 'squad'), (snap) => {
+    const unsubSquad = onSnapshot(SD('squad'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.members) && data.members.length > 0) {
@@ -383,12 +402,12 @@ export default function App() {
       }
     });
     return () => unsubSquad();
-  }, []);
+  }, [teamPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updatePasswords = async (next: typeof passwords) => {
     if (!isAdmin) return;
     setPasswords(next);
-    await setDoc(doc(db, 'settings', 'passwords'), next);
+    await setDoc(SD('passwords'), next);
   };
 
   const staffAccounts = (passwords.staffAccounts && passwords.staffAccounts.length > 0)
@@ -402,20 +421,20 @@ export default function App() {
     if (!isAdmin) return;
     const next = { ...passwords, staffAccounts: accounts };
     setPasswords(next);
-    await setDoc(doc(db, 'settings', 'passwords'), next);
+    await setDoc(SD('passwords'), next);
   };
 
   const handleUpdateSquad = async (members: { name: string; fact: string }[]) => {
     if (!isAdmin) return;
     setSquad(members);
-    await setDoc(doc(db, 'settings', 'squad'), { members });
+    await setDoc(SD('squad'), { members });
   };
 
   const updatePlayerPassword = async (playerName: string, newPass: string): Promise<string | null> => {
     if (!newPass.trim()) return 'New password cannot be empty';
     const next = { ...passwords, players: { ...passwords.players, [playerName]: newPass.trim() } };
     setPasswords(next);
-    await setDoc(doc(db, 'settings', 'passwords'), next);
+    await setDoc(SD('passwords'), next);
     return null;
   };
 
@@ -423,7 +442,7 @@ export default function App() {
     try {
       const id = `faq_${Date.now()}`;
       setFaqItems(prev => [...prev, { id, ...item } as FaqItem]);
-      await setDoc(doc(db, 'faq', id), item);
+      await setDoc(TD('faq', id), item);
     } catch (e) { console.error('Add FAQ error:', e); }
   };
 
@@ -431,22 +450,22 @@ export default function App() {
     try {
       setFaqItems(prev => prev.map(f => f.id === item.id ? item : f));
       const { id, ...data } = item;
-      await setDoc(doc(db, 'faq', id), data);
+      await setDoc(TD('faq', id), data);
     } catch (e) { console.error('Update FAQ error:', e); }
   };
 
   const handleDeleteFaqItem = async (id: string) => {
     try {
       setFaqItems(prev => prev.filter(f => f.id !== id));
-      await deleteDoc(doc(db, 'faq', id));
+      await deleteDoc(TD('faq', id));
     } catch (e) { console.error('Delete FAQ error:', e); }
   };
 
   const handleResetFaq = async () => {
     try {
       const batch = writeBatch(db);
-      faqItems.forEach(item => batch.delete(doc(db, 'faq', item.id)));
-      SEED_FAQS.forEach(({ id, ...data }) => batch.set(doc(db, 'faq', id), data));
+      faqItems.forEach(item => batch.delete(TD('faq', item.id)));
+      SEED_FAQS.forEach(({ id, ...data }) => batch.set(TD('faq', id), data));
       setFaqItems(SEED_FAQS as any[]);
       await batch.commit();
     } catch (e) { console.error('Reset FAQ error:', e); }
@@ -463,7 +482,7 @@ export default function App() {
         submittedAt: serverTimestamp(),
         status: 'new' as const,
       };
-      await setDoc(doc(db, 'featureRequests', id), data);
+      await setDoc(TD('featureRequests', id), data);
 
       const { adminEmail, emailjsServiceId, emailjsTemplateId, emailjsPublicKey } = notificationSettings;
       if (emailjsServiceId && emailjsTemplateId && emailjsPublicKey && adminEmail) {
@@ -472,7 +491,7 @@ export default function App() {
             to_email: adminEmail,
             from_name: featureName.trim() || 'Anonymous',
             message: featureDescription.trim(),
-            app_name: 'EMJSC Hub',
+            app_name: `${teamCtx.teamShortName} Hub`,
           }, emailjsPublicKey);
         } catch (emailErr) {
           console.error('EmailJS send failed (non-fatal):', emailErr);
@@ -495,7 +514,7 @@ export default function App() {
 
   const handleMarkFeatureReviewed = async (id: string) => {
     try {
-      await setDoc(doc(db, 'featureRequests', id), { status: 'reviewed' }, { merge: true });
+      await setDoc(TD('featureRequests', id), { status: 'reviewed' }, { merge: true });
     } catch (e) {
       console.error('Mark reviewed error:', e);
     }
@@ -503,7 +522,7 @@ export default function App() {
 
   const handleDeleteFeatureRequest = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'featureRequests', id));
+      await deleteDoc(TD('featureRequests', id));
     } catch (e) {
       console.error('Delete feature request error:', e);
     }
@@ -513,7 +532,7 @@ export default function App() {
     if (!isAdmin) return;
     setNotificationSettings(settings);
     try {
-      await setDoc(doc(db, 'settings', 'notifications'), settings);
+      await setDoc(SD('notifications'), settings);
     } catch (e) {
       console.error('Update notification settings error:', e);
     }
@@ -522,7 +541,7 @@ export default function App() {
   const handleSendMessage = async (receiver: string, content: string) => {
     if (!userName) return;
     try {
-      const newMsgRef = doc(collection(db, 'messages'));
+      const newMsgRef = doc(TC('messages'));
       await setDoc(newMsgRef, {
         sender: userName,
         receiver,
@@ -542,7 +561,7 @@ export default function App() {
       if (unread.length === 0) return;
       const batch = writeBatch(db);
       unread.forEach(m => {
-        batch.update(doc(db, 'messages', m.id), { read: true });
+        batch.update(TD('messages', m.id), { read: true });
       });
       await batch.commit();
     } catch (error) {
@@ -555,7 +574,7 @@ export default function App() {
     try {
       // Use a consistent ID for the block based on both names so it's idempotent
       const blockId = `${userName.replace(/[^a-zA-Z0-9_]/g, '_')}_${blockedUserName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-      await setDoc(doc(db, 'blocks', blockId), {
+      await setDoc(TD('blocks', blockId), {
         blocker: userName,
         blocked: blockedUserName,
         timestamp: serverTimestamp()
@@ -570,7 +589,7 @@ export default function App() {
     try {
       // Find the block document
       const blockId = `${userName!.replace(/[^a-zA-Z0-9_]/g, '_')}_${blockedUserName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-      await deleteDoc(doc(db, 'blocks', blockId));
+      await deleteDoc(TD('blocks', blockId));
     } catch(err) {
       console.error("Error unblocking:", err);
     }
@@ -579,7 +598,7 @@ export default function App() {
   const handleAdminDeleteMessage = async (messageId: string) => {
     if (!isAdmin) return;
     try {
-      await deleteDoc(doc(db, 'messages', messageId));
+      await deleteDoc(TD('messages', messageId));
     } catch (error) {
       console.error("Error deleting message:", error);
     }
@@ -588,7 +607,7 @@ export default function App() {
   const handleAdminDeleteBlock = async (blockId: string) => {
     if (!isAdmin) return;
     try {
-      await deleteDoc(doc(db, 'blocks', blockId));
+      await deleteDoc(TD('blocks', blockId));
     } catch (error) {
       console.error("Error deleting block:", error);
     }
@@ -597,7 +616,7 @@ export default function App() {
   const handleAddAnnouncement = async (content: string, type: 'message' | 'goal' | 'player_feedback', targetPlayer?: string) => {
     if (!isAdmin) return;
     try {
-      const newRef = doc(collection(db, 'announcements'));
+      const newRef = doc(TC('announcements'));
       const data: any = { content, type, timestamp: serverTimestamp(), author: userName || '' };
       if (targetPlayer) data.targetPlayer = targetPlayer;
       await setDoc(newRef, data);
@@ -611,7 +630,7 @@ export default function App() {
   const handleUpdateAnnouncement = async (announcement: Announcement) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'announcements', announcement.id), announcement, { merge: true });
+      await setDoc(TD('announcements', announcement.id), announcement, { merge: true });
     } catch (error) {
       console.error("Error updating announcement:", error);
     }
@@ -620,7 +639,7 @@ export default function App() {
   const handleDeleteAnnouncement = async (id: string) => {
     if (!isAdmin) return;
     try {
-      await deleteDoc(doc(db, 'announcements', id));
+      await deleteDoc(TD('announcements', id));
     } catch (err) {
       console.error("Error deleting announcement:", err);
     }
@@ -628,7 +647,7 @@ export default function App() {
 
   const handleAddDutyConfig = async (duty: DutyConfig) => {
     try {
-      await setDoc(doc(db, 'dutiesConfig', duty.id), duty);
+      await setDoc(TD('dutiesConfig', duty.id), duty);
     } catch (error) {
       console.error("Error adding duty config:", error);
     }
@@ -637,7 +656,7 @@ export default function App() {
   const handleUpdateDutyConfig = async (duty: DutyConfig) => {
     try {
       const { id, ...data } = duty as any;
-      await setDoc(doc(db, 'dutiesConfig', id), { id, ...data });
+      await setDoc(TD('dutiesConfig', id), { id, ...data });
     } catch (error) {
       console.error("Error updating duty config:", error);
     }
@@ -645,7 +664,7 @@ export default function App() {
 
   const handleDeleteDutyConfig = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'dutiesConfig', id));
+      await deleteDoc(TD('dutiesConfig', id));
     } catch (error) {
       console.error("Error deleting duty config:", error);
     }
@@ -655,7 +674,7 @@ export default function App() {
     if (!isAdmin) return;
     try {
       const feedbackId = `${gameId}_${playerName.replace(/\s+/g, '_')}`;
-      await setDoc(doc(db, 'feedback', feedbackId), {
+      await setDoc(TD('feedback', feedbackId), {
         gameId,
         playerName,
         feedback,
@@ -673,7 +692,7 @@ export default function App() {
     const isNowUnavailable = existing ? !existing.isUnavailable : true;
     
     try {
-      await setDoc(doc(db, 'availabilities', id), {
+      await setDoc(TD('availabilities', id), {
         playerName,
         dateKey,
         isUnavailable: isNowUnavailable,
@@ -705,7 +724,7 @@ export default function App() {
           
           if (changed) {
             updates.swapRequests = currentSwapRequests;
-            batch.update(doc(db, 'games', game.id), updates);
+            batch.update(TD('games', game.id), updates);
           }
         });
         await batch.commit();
@@ -734,7 +753,7 @@ export default function App() {
           
           if (changed) {
             updates.swapRequests = currentSwapRequests;
-            batch.update(doc(db, 'games', game.id), updates);
+            batch.update(TD('games', game.id), updates);
           }
         });
         await batch.commit();
@@ -834,7 +853,7 @@ export default function App() {
         if (dutyId === 'referee') updates.referee = userName;
       }
 
-      await updateDoc(doc(db, 'games', gameId), updates);
+      await updateDoc(TD('games', gameId), updates);
     } catch (error) {
       console.error("Error updating duty:", error);
     } finally {
@@ -861,7 +880,7 @@ export default function App() {
       if (dutyId === 'pitch_marshal') updates.marshalSwapRequested = true;
       if (dutyId === 'referee') updates.refereeSwapRequested = true;
 
-      await updateDoc(doc(db, 'games', gameId), updates);
+      await updateDoc(TD('games', gameId), updates);
     } catch (error) {
       console.error("Swap request error:", error);
     } finally {
@@ -1008,7 +1027,7 @@ export default function App() {
 
       if (changed) {
         updates.assignments = newAssignments;
-        batch.update(doc(db, 'games', g.id), updates);
+        batch.update(TD('games', g.id), updates);
       }
     });
 
@@ -1028,7 +1047,7 @@ export default function App() {
     
     const batch = writeBatch(db);
     games.forEach(g => {
-      batch.update(doc(db, 'games', g.id), {
+      batch.update(TD('games', g.id), {
         snackProvider: "",
         pitchMarshal: "",
         referee: "",
@@ -1057,7 +1076,7 @@ export default function App() {
     setAdminActionStatus('Wiping schedule...');
     const batch = writeBatch(db);
     games.forEach(g => {
-      batch.delete(doc(db, 'games', g.id));
+      batch.delete(TD('games', g.id));
     });
     try {
       await batch.commit();
@@ -1073,7 +1092,7 @@ export default function App() {
   const deleteGame = async (gameId: string) => {
     if (!isAdmin) return;
     try {
-      await deleteDoc(doc(db, 'games', gameId));
+      await deleteDoc(TD('games', gameId));
       setAdminActionStatus('Match deleted');
       setTimeout(() => setAdminActionStatus(null), 2000);
       await bumpCalendar();
@@ -1090,7 +1109,7 @@ export default function App() {
     const dateSlug = date.substring(0, 10).replace(/-/g, '');
     const gameId = `${slug}_${dateSlug}`;
     try {
-      await setDoc(doc(db, 'games', gameId), { opponent, date, location, isHome });
+      await setDoc(TD('games', gameId), { opponent, date, location, isHome });
       await syncTravelTime(gameId, location, date, undefined);
       await bumpCalendar();
     } catch (e: any) {
@@ -1102,7 +1121,7 @@ export default function App() {
   const updateGame = async (gameId: string, updates: Partial<GameType>) => {
     if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'games', gameId), updates);
+      await updateDoc(TD('games', gameId), updates);
 
       const game = games.find(g => g.id === gameId);
       if (game) {
@@ -1159,7 +1178,7 @@ export default function App() {
   const toggleTraining = async (cancelled: boolean) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { trainingCancelled: cancelled }, { merge: true });
+      await setDoc(SD('training'), { trainingCancelled: cancelled }, { merge: true });
     } catch (error) {
       console.error("Toggle training error:", error);
     }
@@ -1168,7 +1187,7 @@ export default function App() {
   const updateTrainingLocation = async (location: string) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { trainingLocation: location }, { merge: true });
+      await setDoc(SD('training'), { trainingLocation: location }, { merge: true });
     } catch (error) {
       console.error("Update training location error:", error);
     }
@@ -1177,7 +1196,7 @@ export default function App() {
   const updateTrainingSchedule = async (schedule: TrainingSession[]) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { trainingSchedule: schedule }, { merge: true });
+      await setDoc(SD('training'), { trainingSchedule: schedule }, { merge: true });
     } catch (error) {
       console.error("Update training schedule error:", error);
     }
@@ -1185,7 +1204,7 @@ export default function App() {
 
   const bumpCalendar = async () => {
     try {
-      await setDoc(doc(db, 'settings', 'calendar'), {
+      await setDoc(SD('calendar'), {
         version: calendarVersion + 1,
         updatedAt: serverTimestamp(),
       });
@@ -1202,7 +1221,7 @@ export default function App() {
   const updateHomeGround = async (location: string) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { homeGround: location }, { merge: true });
+      await setDoc(SD('training'), { homeGround: location }, { merge: true });
     } catch (error) {
       console.error("Update home ground error:", error);
     }
@@ -1211,7 +1230,7 @@ export default function App() {
   const updateTeamLogoUrl = async (url: string) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { teamLogoUrl: url }, { merge: true });
+      await setDoc(SD('training'), { teamLogoUrl: url }, { merge: true });
     } catch (error) {
       console.error("Update team logo URL error:", error);
     }
@@ -1250,7 +1269,7 @@ export default function App() {
       );
       const data = await resp.json();
       if (data.minutes != null) {
-        await updateDoc(doc(db, 'games', gameId), { travelTimeMinutes: data.minutes });
+        await updateDoc(TD('games', gameId), { travelTimeMinutes: data.minutes });
         return data.minutes as number;
       }
     } catch (err) {
@@ -1278,7 +1297,7 @@ export default function App() {
         throw new Error(`No fixtures array found. Top-level keys: ${keys || '(empty)'}`);
       }
 
-      const teamName = overrideTeamName || "EMJSC U8 Saturday White";
+      const teamName = overrideTeamName || teamCtx.teamName || "EMJSC U8 Saturday White";
 
       for (const f of fixtures) {
         const attrs = f.attributes || f;
@@ -1333,7 +1352,7 @@ export default function App() {
         if (attrs.map_url) gameData.mapUrlOverride = attrs.map_url;
 
         try {
-          await setDoc(doc(db, 'games', gameId), gameData, { merge: true });
+          await setDoc(TD('games', gameId), gameData, { merge: true });
           syncedCount++;
           if (homeGround) {
             syncTravelTime(gameId, location, dateISO, attrs.map_url);
@@ -1379,7 +1398,7 @@ export default function App() {
 
   const saveDriblCache = async (cache: import('./components/AdminView').DriblCache) => {
     try {
-      await setDoc(doc(db, 'settings', 'driblCache'), {
+      await setDoc(SD('driblCache'), {
         fixtures: cache.fixtures,
         emjscTeams: cache.emjscTeams,
         selectedTeam: cache.selectedTeam,
@@ -1393,7 +1412,7 @@ export default function App() {
   const updateCoachChild = async (name: string) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { coachChild: name }, { merge: true });
+      await setDoc(SD('training'), { coachChild: name }, { merge: true });
     } catch (error) {
       console.error("Update coach child error:", error);
     }
@@ -1402,7 +1421,7 @@ export default function App() {
   const updateCoachExemptDuties = async (duties: string[]) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { coachExemptDuties: duties }, { merge: true });
+      await setDoc(SD('training'), { coachExemptDuties: duties }, { merge: true });
     } catch (error) {
       console.error("Error updating coach exemptions:", error);
     }
@@ -1411,7 +1430,7 @@ export default function App() {
   const updateMessagingEnabled = async (enabled: boolean) => {
     if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'training'), { messagingEnabled: enabled }, { merge: true });
+      await setDoc(SD('training'), { messagingEnabled: enabled }, { merge: true });
     } catch (error) {
       console.error("Update messaging system error:", error);
     }
@@ -1420,7 +1439,7 @@ export default function App() {
   const updateProfile = async (skills: string, photoUrl: string, avatarConfig?: any) => {
     if (!userName) return;
     try {
-      await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), {
+      await setDoc(TD('profiles', userName.replace(/\s+/g, '_')), {
         skills,
         photoUrl,
         ...(avatarConfig ? { avatarConfig } : {}),
@@ -1467,12 +1486,12 @@ export default function App() {
         <div className="flex flex-col items-center gap-6 mt-12 text-center">
           <img
             src={teamLogoUrl || CLUB_LOGO}
-            alt="EMJSC Logo"
+            alt={`${teamCtx.teamShortName} Logo`}
             className="w-32 drop-shadow-2xl"
             referrerPolicy="no-referrer"
           />
           <div className="space-y-2">
-            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
+            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{teamCtx.teamShortName} Hub</h1>
             <p className="text-slate-500 text-sm font-bold italic">
               {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
@@ -1642,8 +1661,8 @@ export default function App() {
               referrerPolicy="no-referrer"
             />
             <div>
-              <h1 className="text-lg font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
-              <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-1">U8 White Saturday</p>
+              <h1 className="text-lg font-black tracking-tight text-emjsc-navy leading-none uppercase">{teamCtx.teamShortName} Hub</h1>
+              <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-1">{teamCtx.teamName.replace(teamCtx.teamShortName, '').trim()}</p>
             </div>
           </button>
 
@@ -1813,7 +1832,7 @@ export default function App() {
                     ? (() => { const { club, team } = splitOpponent(selectedGame.opponent); return `Vs ${club || team}`; })()
                     : 'Match Details'}
               </h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">{userName} • EMJSC U8 Saturday White</p>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">{userName} • {teamCtx.teamName}</p>
             </div>
           </header>
 
@@ -2693,7 +2712,7 @@ export default function App() {
                     className="max-w-2xl mx-auto"
                   >
                     <Suspense fallback={null}>
-                      <HelpView faqItems={faqItems} userRole={userRole} isAdmin={isAdmin} onShowTerms={(doc: 'terms' | 'privacy') => setViewingDoc(doc)} />
+                      <HelpView faqItems={faqItems} globalFaqItems={globalFaqItems} userRole={userRole} isAdmin={isAdmin} onShowTerms={(doc: 'terms' | 'privacy') => setViewingDoc(doc)} />
                     </Suspense>
                   </motion.div>
                 )}
@@ -2724,7 +2743,7 @@ export default function App() {
                     </div>
                     <div>
                       <h3 className="text-base font-black uppercase tracking-tight text-emjsc-navy leading-none">Submit Feedback or Ideas</h3>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Help us improve the EMJSC Hub</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Help us improve the {teamCtx.teamShortName} Hub</p>
                     </div>
                     <button onClick={() => setShowFeatureModal(false)} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
                       <X className="w-4 h-4" />
