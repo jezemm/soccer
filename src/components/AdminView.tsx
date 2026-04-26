@@ -592,7 +592,9 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
 
     if (cachedEntry) {
       const ourTeams = cachedEntry.allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
-      const firstTeam = ourTeams[0] ?? cachedEntry.allTeams[0] ?? '';
+      const fallbackTeam = ourTeams[0] ?? cachedEntry.allTeams[0] ?? '';
+      const savedTeam = driblCache?.selectedTeam;
+      const firstTeam = (savedTeam && cachedEntry.allTeams.includes(savedTeam)) ? savedTeam : fallbackTeam;
       setPhase({ tag: 'preview', competition, club, allFixtures: cachedEntry.fixtures, allTeams: cachedEntry.allTeams, selectedTeamClub: extractClubName(firstTeam), selectedTeam: firstTeam, cachedAt: cachedEntry.scrapedAt });
       return;
     }
@@ -612,7 +614,9 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
       }
       const allTeams = Array.from(teamSet).sort();
       const ourTeams = allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
-      const firstTeam = ourTeams[0] ?? allTeams[0] ?? '';
+      const fallbackTeam = ourTeams[0] ?? allTeams[0] ?? '';
+      const savedTeam = driblCache?.selectedTeam;
+      const firstTeam = (savedTeam && allTeams.includes(savedTeam)) ? savedTeam : fallbackTeam;
       const selectedTeamClub = extractClubName(firstTeam);
       const scrapedAt = new Date().toISOString();
       const newFixtureCache = { ...(driblCache?.fixtureCache ?? {}), [cacheKey]: { fixtures: result.fixtures, allTeams, scrapedAt } };
@@ -631,6 +635,11 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
     setPhase({ ...phase, saving: true });
     try {
       await onConfirmSync(allFixtures, selectedTeam, teamLogo);
+      await onSaveDriblCache({
+        ...(driblCache ?? { fixtures: [], allTeams: [], selectedTeam: '', savedAt: new Date().toISOString() }),
+        selectedTeam,
+        selectedClub: selectedTeamClub,
+      });
       const count = allFixtures.filter(f => (f.home_team_name || '').includes(selectedTeam) || (f.away_team_name || '').includes(selectedTeam)).length;
       setPhase({ tag: 'preview', competition, club, allFixtures, allTeams, selectedTeamClub, selectedTeam, cachedAt, saving: false, savedCount: count });
     } catch (err: any) {
