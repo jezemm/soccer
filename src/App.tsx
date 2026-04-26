@@ -1533,9 +1533,9 @@ export default function App() {
         <div className="absolute right-6" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
           <button
             onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); }}
-            className="flex items-center gap-1.5 px-3 py-2 text-white bg-emjsc-navy rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
+            className="flex items-center gap-1.5 px-3 py-2 text-slate-400 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all active:scale-95"
           >
-            <Shield className="w-3.5 h-3.5 text-emjsc-red" />
+            <Shield className="w-3.5 h-3.5 text-slate-400" />
             <span className="text-[9px] font-black uppercase tracking-widest">Admin</span>
           </button>
         </div>
