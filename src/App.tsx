@@ -1540,7 +1540,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mt-14 w-full">
+        <div className="flex items-center gap-4 mt-14 w-64 mx-auto">
           <img
             src={teamLogoUrl || CLUB_LOGO}
             alt="EMJSC Logo"
