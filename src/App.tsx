@@ -1568,17 +1568,17 @@ export default function App() {
                 <button
                   key={player.name}
                   onClick={() => setTargetPlayerProfile(player.name)}
-                  className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                  className="w-full flex items-center gap-3 py-3 px-5 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
                 >
                   <AvatarImage
                     config={profiles[profileKey]?.avatarConfig}
                     photoUrl={profiles[profileKey]?.photoUrl}
                     fallbackName={player.name}
                     alt={player.name}
-                    className="w-7 h-7 rounded-full shrink-0"
+                    className="w-10 h-10 rounded-full shrink-0"
                   />
-                  <p className="text-xs font-black text-slate-800 text-left leading-tight">{player.name}</p>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
+                  <p className="text-sm font-black text-slate-800 text-left leading-tight">{player.name}</p>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
                 </button>
               );
             })}
@@ -1593,20 +1593,20 @@ export default function App() {
                 <button
                   key={account.id}
                   onClick={() => { setTargetAdminRole(account.id); setPlayerLoginCode(''); setLoginError(null); }}
-                  className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                  className="w-full flex items-center gap-3 py-3 px-5 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
                 >
                   <AvatarImage
                     config={profiles[profileKey]?.avatarConfig}
                     photoUrl={profiles[profileKey]?.photoUrl}
                     fallbackName={account.name}
                     alt={account.name}
-                    className="w-7 h-7 rounded-full shrink-0"
+                    className="w-10 h-10 rounded-full shrink-0"
                   />
                   <div className="text-left">
-                    <p className="text-xs font-black text-slate-800 leading-tight">{account.name}</p>
+                    <p className="text-sm font-black text-slate-800 leading-tight">{account.name}</p>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{account.role}</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
                 </button>
               );
             })}
