@@ -423,19 +423,31 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   driblCache: DriblCache | null;
   onSaveDriblCache: (cache: DriblCache) => Promise<void>;
 }) {
+  // Cache is considered stale if it was saved without a competitionUrl (old club-filtered sync)
+  // or if it only contains teams from a single club.
+  const isCacheStale = (cache: DriblCache): boolean => {
+    if (!cache.competitionUrl) return true;
+    const clubs = new Set(cache.allTeams.map(extractClubName));
+    return clubs.size <= 1;
+  };
+
+  const buildPreviewFromCache = (cache: DriblCache): Extract<ScrapePhase, { tag: 'preview' }> => {
+    const selectedTeam = cache.selectedTeam;
+    const selectedClub = cache.selectedClub || extractClubName(selectedTeam);
+    return {
+      tag: 'preview',
+      allFixtures: cache.fixtures,
+      allTeams: cache.allTeams,
+      selectedClub,
+      selectedTeam,
+      competitionUrl: cache.competitionUrl || DEFAULT_COMPETITION_URL,
+      cachedAt: cache.savedAt,
+    };
+  };
+
   const initPhase = (): ScrapePhase => {
-    if (driblCache && driblCache.fixtures.length > 0) {
-      const selectedTeam = driblCache.selectedTeam;
-      const selectedClub = driblCache.selectedClub || extractClubName(selectedTeam);
-      return {
-        tag: 'preview',
-        allFixtures: driblCache.fixtures,
-        allTeams: driblCache.allTeams,
-        selectedClub,
-        selectedTeam,
-        competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
-        cachedAt: driblCache.savedAt,
-      };
+    if (driblCache && driblCache.fixtures.length > 0 && !isCacheStale(driblCache)) {
+      return buildPreviewFromCache(driblCache);
     }
     return { tag: 'setup', url: driblCache?.competitionUrl || DEFAULT_COMPETITION_URL };
   };
@@ -447,17 +459,8 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
     if (!driblCache || driblCache.fixtures.length === 0) return;
     setPhase(prev => {
       if (prev.tag !== 'setup') return prev;
-      const selectedTeam = driblCache.selectedTeam;
-      const selectedClub = driblCache.selectedClub || extractClubName(selectedTeam);
-      return {
-        tag: 'preview',
-        allFixtures: driblCache.fixtures,
-        allTeams: driblCache.allTeams,
-        selectedClub,
-        selectedTeam,
-        competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
-        cachedAt: driblCache.savedAt,
-      };
+      if (isCacheStale(driblCache)) return prev; // keep on setup so user re-syncs
+      return buildPreviewFromCache(driblCache);
     });
   }, [driblCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -512,8 +515,15 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   // ── Setup ──
   if (phase.tag === 'setup') {
     const { url } = phase;
+    const hasStaleCache = !!(driblCache && driblCache.fixtures.length > 0 && isCacheStale(driblCache));
     return (
       <div className="space-y-3">
+        {hasStaleCache && (
+          <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-2xl">
+            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-amber-700">Re-sync required</p>
+            <p className="text-[9px] text-amber-600 font-medium mt-0.5">Previous data only had one club. Load fixtures again to get all clubs in the competition.</p>
+          </div>
+        )}
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy mb-1">Sync Fixtures</p>
           <p className="text-[9px] text-slate-400 font-medium">Paste your Dribl competition URL to load all fixtures</p>
