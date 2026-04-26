@@ -1568,7 +1568,7 @@ export default function App() {
                 <button
                   key={player.name}
                   onClick={() => setTargetPlayerProfile(player.name)}
-                  className="w-full flex items-center gap-3 py-3 px-5 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                  className="w-full flex items-center gap-3 py-1.5 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
                 >
                   <AvatarImage
                     config={profiles[profileKey]?.avatarConfig}
@@ -1593,7 +1593,7 @@ export default function App() {
                 <button
                   key={account.id}
                   onClick={() => { setTargetAdminRole(account.id); setPlayerLoginCode(''); setLoginError(null); }}
-                  className="w-full flex items-center gap-3 py-3 px-5 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                  className="w-full flex items-center gap-3 py-1.5 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
                 >
                   <AvatarImage
                     config={profiles[profileKey]?.avatarConfig}
