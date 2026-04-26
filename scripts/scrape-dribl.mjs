@@ -80,7 +80,8 @@ function extractNewCards(seenIds) {
 
 /** @returns {{ fixtures: object[], debug: object }} */
 export async function scrapeDriblFixtures() {
-  const browser = await chromium.launch({ headless: true });
+  // Non-headless avoids Cloudflare bot detection (a Chrome window will briefly appear)
+  const browser = await chromium.launch({ headless: false });
   const page = await browser.newPage();
   const debug = { url: DRIBL_URL, totalCards: 0, pages: 1, error: null };
 
