@@ -382,8 +382,9 @@ const DEFAULT_COMPETITION_URL =
   'https://fv.dribl.com/fixtures/?date_range=default&season=nPmrj2rmow&competition=Rxm8RpZLKr&timezone=Australia%2FMelbourne';
 
 function teamDisplayName(fullName: string): string {
+  // Strip "U08 MiniRoos - Joeys Mixed " boilerplate, keeping club and grade
   return fullName
-    .replace(/\s+MiniRoos\s*-\s*[^,]+/i, '')
+    .replace(/\s*U\d{2,3}\s+MiniRoos\s*-\s*Joeys Mixed\s*/i, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
