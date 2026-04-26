@@ -112,7 +112,8 @@ export function OnboardingWizard({ playerName, teamLogoUrl, initialProfile, onCo
   });
 
   return (
-    <div className="mobile-container flex flex-col h-dvh bg-white">
+    <div className="min-h-dvh w-full flex md:items-center md:justify-center md:bg-slate-200/60">
+    <div className="w-full max-w-sm mx-auto flex flex-col h-dvh md:h-auto md:max-h-[92dvh] md:rounded-3xl md:shadow-2xl md:overflow-hidden bg-white">
 
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0">
@@ -327,6 +328,7 @@ export function OnboardingWizard({ playerName, teamLogoUrl, initialProfile, onCo
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }
