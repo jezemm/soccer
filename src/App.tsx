@@ -93,6 +93,7 @@ function ChangePasswordForm({ playerName, onSave }: { playerName: string; onSave
 export default function App() {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('teamtrack_user'));
   const [loading, setLoading] = useState(true);
+  const [brandLoaded, setBrandLoaded] = useState(false);
   const [gamesLoaded, setGamesLoaded] = useState(false);
   const [games, setGames] = useState<GameType[]>([]);
   const [squad, setSquad] = useState<{ name: string; fact: string }[]>(TEAM_SQUAD);
@@ -137,6 +138,7 @@ export default function App() {
   const [calendarVersion, setCalendarVersion] = useState(0);
   const [calendarUpdatedAt, setCalendarUpdatedAt] = useState<Date | null>(null);
   const calendarCardRef = useRef<HTMLDivElement>(null);
+  const brandReadyRef = useRef({ training: false, driblCache: false });
   const [driblCache, setDriblCache] = useState<import('./components/AdminView').DriblCache | null>(null);
   const [trainingCancelled, setTrainingCancelled] = useState(false);
   const [trainingSchedule, setTrainingSchedule] = useState<TrainingSession[]>([]);
@@ -216,6 +218,8 @@ export default function App() {
         setCoachExemptDuties(data.coachExemptDuties || []);
         setMessagingEnabled(data.messagingEnabled !== false);
       }
+      brandReadyRef.current.training = true;
+      if (brandReadyRef.current.driblCache) setBrandLoaded(true);
     });
     return () => unsubscribe();
   }, []);
@@ -267,6 +271,8 @@ export default function App() {
           fixtureCache: data.fixtureCache || undefined,
         });
       }
+      brandReadyRef.current.driblCache = true;
+      if (brandReadyRef.current.training) setBrandLoaded(true);
     });
     return () => unsubscribe();
   }, []);
@@ -1507,12 +1513,8 @@ export default function App() {
     if (!existing) document.head.appendChild(link);
   }, [teamLogoUrl]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
+  if (loading || (!userName && !brandLoaded)) {
+    return <div className="mobile-container min-h-screen bg-white" />;
   }
 
   if (userName && !termsAccepted) {
