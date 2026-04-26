@@ -1529,8 +1529,8 @@ export default function App() {
 
   if (!userName) {
     return (
-      <div className="mobile-container flex flex-col items-center p-8 space-y-8 bg-white min-h-screen relative">
-        <div className="absolute right-6" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
+      <div className="mobile-container flex flex-col items-center px-6 pt-4 pb-8 space-y-4 bg-white min-h-screen relative">
+        <div className="absolute right-6" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
           <button
             onClick={() => { setTargetPlayerProfile('ADMIN'); setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); }}
             className="flex items-center gap-1.5 px-3 py-2 text-white bg-emjsc-navy rounded-xl hover:shadow-lg transition-all active:scale-95 shadow-md shadow-blue-900/20"
@@ -1540,16 +1540,16 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex flex-col items-center gap-6 mt-12 text-center">
+        <div className="flex items-center gap-4 mt-8 w-full">
           <img
             src={teamLogoUrl || CLUB_LOGO}
             alt="EMJSC Logo"
-            className="w-32 drop-shadow-2xl"
+            className="w-14 h-14 object-contain drop-shadow-lg shrink-0"
             referrerPolicy="no-referrer"
           />
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
-            <p className="text-slate-500 text-sm font-bold italic">
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
+            <p className="text-slate-500 text-xs font-bold italic mt-1">
               {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
           </div>
