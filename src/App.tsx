@@ -2277,7 +2277,7 @@ export default function App() {
                               <p className="text-[9px] font-black text-white uppercase tracking-tight leading-none">Apple</p>
                             </a>
                             <a
-                              href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent("https://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS")}`}
+                              href={`https://calendar.google.com/calendar/r/settings/addbyurl?url=${encodeURIComponent("https://australia-southeast1-gen-lang-client-0029897959.cloudfunctions.net/fixturesICS")}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex-1 text-center px-2 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition-all active:scale-[0.98]"
