@@ -1361,8 +1361,16 @@ export default function App() {
   };
 
 
+  const requiresDevServer = (res: Response) => {
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error('Sync requires the local dev server — run npm run dev on your Mac, then open http://localhost:3000');
+    }
+  };
+
   const fetchDriblCompetitions = async (): Promise<{ competitions: import('./components/AdminView').DriblCompetition[] }> => {
     const res = await fetch('/api/dribl/competitions');
+    requiresDevServer(res);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `HTTP ${res.status}`);
@@ -1372,6 +1380,7 @@ export default function App() {
 
   const fetchDriblClubs = async (competitionId: string, season: string): Promise<{ clubs: import('./components/AdminView').DriblClub[] }> => {
     const res = await fetch(`/api/dribl/clubs?competition=${encodeURIComponent(competitionId)}&season=${encodeURIComponent(season)}`);
+    requiresDevServer(res);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `HTTP ${res.status}`);
@@ -1384,6 +1393,7 @@ export default function App() {
     try {
       const params = url ? `?url=${encodeURIComponent(url)}` : '';
       const res = await fetch(`/api/scrape-dribl${params}`);
+      requiresDevServer(res);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
