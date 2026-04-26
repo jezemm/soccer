@@ -52,6 +52,7 @@ import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerA
 import { AvatarEditor } from './components/AvatarEditor';
 import { AvatarImage } from './components/AvatarImage';
 import { TermsModal, DocModal } from './components/TermsModal';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
@@ -170,6 +171,10 @@ export default function App() {
   const [playerLoginCode, setPlayerLoginCode] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<string | null>(null); // gameId-dutyId
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('setup');
+  });
 
   const latestWrappedGame = null;
 
@@ -762,7 +767,7 @@ export default function App() {
 
   const handleLogin = (playerName: string) => {
     const finalCorrectPass = passwords.players[playerName] || 'EMJSC2026';
-    
+
     if (playerLoginCode === finalCorrectPass) {
       localStorage.setItem('teamtrack_user', playerName);
       localStorage.setItem('teamtrack_admin', 'false');
@@ -771,6 +776,10 @@ export default function App() {
       setTargetPlayerProfile(null);
       setPlayerLoginCode('');
       setLoginError(null);
+      const onboardedKey = `teamtrack_onboarded_${playerName.replace(/\s+/g, '_')}`;
+      if (!localStorage.getItem(onboardedKey)) {
+        setShowOnboarding(true);
+      }
     } else {
       setLoginError("Incorrect password");
     }
@@ -1526,6 +1535,30 @@ export default function App() {
         onAccept={() => {
           localStorage.setItem('teamtrack_terms_v1', 'accepted');
           setTermsAccepted(true);
+        }}
+      />
+    );
+  }
+
+  if (userName && showOnboarding) {
+    const onboardedKey = `teamtrack_onboarded_${userName.replace(/\s+/g, '_')}`;
+    const currentProfile = profiles[userName.replace(/\s+/g, '_')];
+    return (
+      <OnboardingWizard
+        playerName={userName}
+        teamLogoUrl={teamLogoUrl}
+        initialProfile={currentProfile}
+        onComplete={async ({ skills, avatarConfig, photoUrl, newPassword }) => {
+          await updateProfile(skills, photoUrl, avatarConfig);
+          if (newPassword) {
+            await updatePlayerPassword(userName, newPassword);
+          }
+          localStorage.setItem(onboardedKey, '1');
+          setShowOnboarding(false);
+        }}
+        onSkip={() => {
+          localStorage.setItem(onboardedKey, '1');
+          setShowOnboarding(false);
         }}
       />
     );
