@@ -1540,15 +1540,15 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mt-8 w-full">
+        <div className="flex items-center gap-4 mt-14 w-full">
           <img
             src={teamLogoUrl || CLUB_LOGO}
             alt="EMJSC Logo"
-            className="w-14 h-14 object-contain drop-shadow-lg shrink-0"
+            className="w-16 h-16 object-contain drop-shadow-lg shrink-0"
             referrerPolicy="no-referrer"
           />
           <div>
-            <h1 className="text-xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
+            <h1 className="text-2xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
             <p className="text-slate-500 text-xs font-bold italic mt-1">
               {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
