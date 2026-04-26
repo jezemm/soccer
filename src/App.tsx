@@ -254,9 +254,10 @@ export default function App() {
         const data = snapshot.data();
         setDriblCache({
           fixtures: data.fixtures || [],
-          emjscTeams: data.emjscTeams || [],
+          allTeams: data.allTeams || data.emjscTeams || [],
           selectedTeam: data.selectedTeam || '',
           savedAt: data.savedAt || new Date().toISOString(),
+          competitionUrl: data.competitionUrl || '',
         });
       }
     });
@@ -1358,10 +1359,11 @@ export default function App() {
   };
 
 
-  const fetchDriblFixtures = async (): Promise<{ fixtures: any[]; debug: any } | null> => {
+  const fetchDriblFixtures = async (url: string): Promise<{ fixtures: any[]; debug: any } | null> => {
     if (!isAdmin) return null;
     try {
-      const res = await fetch('/api/scrape-dribl');
+      const params = url ? `?url=${encodeURIComponent(url)}` : '';
+      const res = await fetch(`/api/scrape-dribl${params}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
@@ -1373,17 +1375,21 @@ export default function App() {
     }
   };
 
-  const confirmSyncFixtures = async (fixtures: any[], teamName: string) => {
+  const confirmSyncFixtures = async (fixtures: any[], teamName: string, teamLogoUrl?: string) => {
     await bulkSyncFixtures({ data: fixtures }, teamName);
+    if (teamLogoUrl) {
+      await updateTeamLogoUrl(teamLogoUrl);
+    }
   };
 
   const saveDriblCache = async (cache: import('./components/AdminView').DriblCache) => {
     try {
       await setDoc(doc(db, 'settings', 'driblCache'), {
         fixtures: cache.fixtures,
-        emjscTeams: cache.emjscTeams,
+        allTeams: cache.allTeams,
         selectedTeam: cache.selectedTeam,
         savedAt: cache.savedAt,
+        competitionUrl: cache.competitionUrl || '',
       });
     } catch (err) {
       console.error('saveDriblCache error:', err);

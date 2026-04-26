@@ -16,7 +16,7 @@ chromium.use(StealthPlugin());
 
 const DRIBL_URL =
   'https://fv.dribl.com/fixtures/?date_range=default' +
-  '&season=nPmrj2rmow&competition=Rxm8RpZLKr&club=3pmvQzZrdv' +
+  '&season=nPmrj2rmow&competition=Rxm8RpZLKr' +
   '&timezone=Australia%2FMelbourne';
 
 const MONTH_MAP = {
@@ -79,14 +79,14 @@ function extractNewCards(seenIds) {
 }
 
 /** @returns {{ fixtures: object[], debug: object }} */
-export async function scrapeDriblFixtures() {
+export async function scrapeDriblFixtures(url = DRIBL_URL) {
   // Non-headless avoids Cloudflare bot detection (a Chrome window will briefly appear)
   const browser = await chromium.launch({ headless: false });
   const page = await browser.newPage();
-  const debug = { url: DRIBL_URL, totalCards: 0, pages: 1, error: null };
+  const debug = { url, totalCards: 0, pages: 1, error: null };
 
   try {
-    await page.goto(DRIBL_URL, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(3000);
 
     // Dismiss cookie banner if present
@@ -178,10 +178,12 @@ export async function scrapeDriblFixtures() {
 // ── CLI entry point ──────────────────────────────────────────────────────────
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const jsonMode = process.argv.includes('--json');
+  const urlIdx = process.argv.indexOf('--url');
+  const cliUrl = urlIdx !== -1 ? process.argv[urlIdx + 1] : DRIBL_URL;
 
   if (jsonMode) {
     // Machine-readable mode: emit only a single JSON line to stdout.
-    scrapeDriblFixtures()
+    scrapeDriblFixtures(cliUrl)
       .then(result => { process.stdout.write(JSON.stringify(result) + '\n'); })
       .catch(err => {
         process.stdout.write(JSON.stringify({ fixtures: [], debug: { error: err.message } }) + '\n');
@@ -190,7 +192,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   } else {
     // Human-readable mode for direct CLI use.
     console.log('Scraping Dribl fixtures…');
-    scrapeDriblFixtures()
+    scrapeDriblFixtures(cliUrl)
       .then(({ fixtures, debug }) => {
         console.log('\n── Debug ──');
         console.log(JSON.stringify(debug, null, 2));

@@ -67,9 +67,12 @@ async function startServer() {
   // Spawns a child Node process to avoid ESM/tsx dynamic-import issues.
   app.get("/api/scrape-dribl", (req, res) => {
     const scriptPath = path.join(__dirname, 'scripts', 'scrape-dribl.mjs');
-    console.log('[scrape-dribl] spawning:', scriptPath);
+    const url = (req.query.url as string) || '';
+    const args = ['--json'];
+    if (url) args.push('--url', url);
+    console.log('[scrape-dribl] spawning:', scriptPath, url ? `url=${url}` : '(default url)');
 
-    execFile('node', [scriptPath, '--json'], {
+    execFile('node', [scriptPath, ...args], {
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
     }, (err, stdout, stderr) => {

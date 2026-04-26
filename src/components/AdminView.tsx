@@ -370,25 +370,56 @@ function CoachPlayerDutiesPanel({ games, dutiesConfig, squad, onManualAssign }: 
 
 // ── DriblScrapePanel ──────────────────────────────────────────────────────────
 
-export type DriblCache = { fixtures: any[]; emjscTeams: string[]; selectedTeam: string; savedAt: string };
+export type DriblCache = {
+  fixtures: any[];
+  allTeams: string[];
+  selectedTeam: string;
+  savedAt: string;
+  competitionUrl?: string;
+};
+
+const DEFAULT_COMPETITION_URL =
+  'https://fv.dribl.com/fixtures/?date_range=default&season=nPmrj2rmow&competition=Rxm8RpZLKr&timezone=Australia%2FMelbourne';
+
+function teamDisplayName(fullName: string): string {
+  return fullName
+    .replace(/\s+MiniRoos\s*-\s*[^,]+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findTeamLogo(fixtures: any[], teamName: string): string | null {
+  for (const f of fixtures) {
+    if ((f.home_team_name || '').includes(teamName) && f.home_team_logo) return f.home_team_logo;
+    if ((f.away_team_name || '').includes(teamName) && f.away_team_logo) return f.away_team_logo;
+  }
+  return null;
+}
 
 type ScrapePhase =
-  | { tag: 'idle' }
+  | { tag: 'setup'; url: string }
   | { tag: 'scraping' }
-  | { tag: 'preview'; allFixtures: any[]; emjscTeams: string[]; selectedTeam: string; cachedAt?: string; saving?: boolean; savedCount?: number }
-  | { tag: 'error'; message: string };
+  | { tag: 'preview'; allFixtures: any[]; allTeams: string[]; selectedTeam: string; competitionUrl: string; cachedAt?: string; saving?: boolean; savedCount?: number }
+  | { tag: 'error'; message: string; url: string };
 
 function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDriblCache }: {
-  onFetchDribl: () => Promise<{ fixtures: any[]; debug: any } | null>;
-  onConfirmSync: (fixtures: any[], teamName: string) => Promise<void>;
+  onFetchDribl: (url: string) => Promise<{ fixtures: any[]; debug: any } | null>;
+  onConfirmSync: (fixtures: any[], teamName: string, teamLogoUrl?: string) => Promise<void>;
   driblCache: DriblCache | null;
   onSaveDriblCache: (cache: DriblCache) => Promise<void>;
 }) {
   const initPhase = (): ScrapePhase => {
     if (driblCache && driblCache.fixtures.length > 0) {
-      return { tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt };
+      return {
+        tag: 'preview',
+        allFixtures: driblCache.fixtures,
+        allTeams: driblCache.allTeams,
+        selectedTeam: driblCache.selectedTeam,
+        competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
+        cachedAt: driblCache.savedAt,
+      };
     }
-    return { tag: 'idle' };
+    return { tag: 'setup', url: driblCache?.competitionUrl || DEFAULT_COMPETITION_URL };
   };
 
   const [phase, setPhase] = React.useState<ScrapePhase>(initPhase);
@@ -397,70 +428,100 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   React.useEffect(() => {
     if (!driblCache || driblCache.fixtures.length === 0) return;
     setPhase(prev =>
-      prev.tag === 'idle'
-        ? { tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt }
+      prev.tag === 'setup'
+        ? {
+            tag: 'preview',
+            allFixtures: driblCache.fixtures,
+            allTeams: driblCache.allTeams,
+            selectedTeam: driblCache.selectedTeam,
+            competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
+            cachedAt: driblCache.savedAt,
+          }
         : prev
     );
   }, [driblCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startScrape = async () => {
+  const startScrape = async (url: string) => {
     setPhase({ tag: 'scraping' });
     try {
-      const result = await onFetchDribl();
+      const result = await onFetchDribl(url);
       if (!result || result.fixtures.length === 0) {
-        setPhase({ tag: 'error', message: 'Sync returned no fixtures. Check server logs.' });
+        setPhase({ tag: 'error', message: 'Sync returned no fixtures. Check the competition URL and try again.', url });
         return;
       }
       const teamSet = new Set<string>();
       for (const f of result.fixtures) {
-        for (const name of [f.home_team_name, f.away_team_name]) {
-          if (name && /east malvern|emjsc|emjs/i.test(name)) teamSet.add(name);
-        }
+        if (f.home_team_name) teamSet.add(f.home_team_name);
+        if (f.away_team_name) teamSet.add(f.away_team_name);
       }
-      const emjscTeams = Array.from(teamSet).sort();
-      const selectedTeam = emjscTeams.find(t => /saturday white/i.test(t)) ?? emjscTeams[0] ?? '';
-      const cache: DriblCache = { fixtures: result.fixtures, emjscTeams, selectedTeam, savedAt: new Date().toISOString() };
+      const allTeams = Array.from(teamSet).sort();
+      const selectedTeam = allTeams[0] ?? '';
+      const cache: DriblCache = {
+        fixtures: result.fixtures,
+        allTeams,
+        selectedTeam,
+        savedAt: new Date().toISOString(),
+        competitionUrl: url,
+      };
       await onSaveDriblCache(cache);
-      setPhase({ tag: 'preview', allFixtures: result.fixtures, emjscTeams, selectedTeam, cachedAt: cache.savedAt });
+      setPhase({ tag: 'preview', allFixtures: result.fixtures, allTeams, selectedTeam, competitionUrl: url, cachedAt: cache.savedAt });
     } catch (err: any) {
-      setPhase({ tag: 'error', message: err?.message || 'Unknown error' });
+      setPhase({ tag: 'error', message: err?.message || 'Unknown error', url });
     }
   };
 
   const confirmSync = async () => {
     if (phase.tag !== 'preview' || phase.saving) return;
-    const { allFixtures, emjscTeams, selectedTeam, cachedAt } = phase;
-    setPhase({ tag: 'preview', allFixtures, emjscTeams, selectedTeam, cachedAt, saving: true });
+    const { allFixtures, allTeams, selectedTeam, cachedAt, competitionUrl } = phase;
+    const teamLogo = findTeamLogo(allFixtures, selectedTeam) ?? undefined;
+    setPhase({ tag: 'preview', allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving: true });
     try {
-      await onConfirmSync(allFixtures, selectedTeam);
+      await onConfirmSync(allFixtures, selectedTeam, teamLogo);
       const count = allFixtures.filter(f =>
         (f.home_team_name || '').includes(selectedTeam) ||
         (f.away_team_name || '').includes(selectedTeam)
       ).length;
-      setPhase({ tag: 'preview', allFixtures, emjscTeams, selectedTeam, cachedAt, saving: false, savedCount: count });
+      setPhase({ tag: 'preview', allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving: false, savedCount: count });
     } catch (err: any) {
-      setPhase({ tag: 'error', message: err?.message || 'Sync failed' });
+      setPhase({ tag: 'error', message: err?.message || 'Sync failed', url: competitionUrl });
     }
   };
 
-  // ── Idle ──
-  if (phase.tag === 'idle') return (
-    <button
-      onClick={startScrape}
-      className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3"
-    >
-      <Zap className="w-4 h-4 text-yellow-300" />
-      Sync from Dribl — Fixtures, Logos &amp; Maps
-    </button>
-  );
+  // ── Setup ──
+  if (phase.tag === 'setup') {
+    const { url } = phase;
+    return (
+      <div className="space-y-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy mb-1">Sync Fixtures</p>
+          <p className="text-[9px] text-slate-400 font-medium">Paste your Dribl competition URL to load all fixtures</p>
+        </div>
+        <textarea
+          value={url}
+          onChange={e => setPhase({ tag: 'setup', url: e.target.value })}
+          rows={3}
+          placeholder={DEFAULT_COMPETITION_URL}
+          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[9px] font-mono text-slate-700 outline-none focus:ring-1 focus:ring-emjsc-navy resize-none"
+        />
+        <button
+          onClick={() => startScrape(url.trim() || DEFAULT_COMPETITION_URL)}
+          disabled={!url.trim()}
+          className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3 disabled:opacity-40"
+        >
+          <Zap className="w-4 h-4 text-yellow-300" />
+          Load Fixtures
+        </button>
+      </div>
+    );
+  }
 
   // ── Scraping ──
   if (phase.tag === 'scraping') return (
     <div className="w-full bg-emjsc-navy/10 border border-emjsc-navy/20 rounded-2xl p-5 flex items-center gap-3">
       <RefreshCw className="w-4 h-4 text-emjsc-navy animate-spin shrink-0" />
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Scraping Dribl…</p>
-        <p className="text-[9px] text-slate-400 font-medium mt-0.5">Loading all pages — this takes ~30s</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Loading Fixtures…</p>
+        <p className="text-[9px] text-slate-400 font-medium mt-0.5">Scraping all pages — this takes ~30s</p>
       </div>
     </div>
   );
@@ -473,27 +534,34 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         <p className="text-[10px] text-red-700 font-medium">{phase.message}</p>
       </div>
       <div className="flex gap-2">
-        <button onClick={startScrape} className="flex-1 bg-emjsc-navy text-white text-[10px] font-black uppercase py-3 rounded-2xl flex items-center justify-center gap-2">
+        <button onClick={() => setPhase({ tag: 'setup', url: phase.url })} className="flex-1 bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200">
+          Change URL
+        </button>
+        <button onClick={() => startScrape(phase.url)} className="flex-1 bg-emjsc-navy text-white text-[10px] font-black uppercase py-3 rounded-2xl flex items-center justify-center gap-2">
           <RefreshCw className="w-3.5 h-3.5" />Try Again
         </button>
-        {driblCache && (
-          <button onClick={() => setPhase({ tag: 'preview', allFixtures: driblCache.fixtures, emjscTeams: driblCache.emjscTeams, selectedTeam: driblCache.selectedTeam, cachedAt: driblCache.savedAt })}
-            className="flex-1 bg-slate-100 text-emjsc-navy text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200">
-            Use Cached
-          </button>
-        )}
       </div>
+      {driblCache && driblCache.fixtures.length > 0 && (
+        <button
+          onClick={() => setPhase({ tag: 'preview', allFixtures: driblCache.fixtures, allTeams: driblCache.allTeams, selectedTeam: driblCache.selectedTeam, competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL, cachedAt: driblCache.savedAt })}
+          className="w-full bg-slate-50 text-slate-500 text-[10px] font-black uppercase py-3 rounded-2xl border border-slate-200"
+        >
+          Use Cached Data
+        </button>
+      )}
     </div>
   );
 
   // ── Preview ──
-  const { allFixtures, emjscTeams, selectedTeam, cachedAt, saving, savedCount } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
+  const { allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving, savedCount } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
   const teamFixtures = allFixtures
     .filter(f =>
       (f.home_team_name || '').includes(selectedTeam) ||
       (f.away_team_name || '').includes(selectedTeam)
     )
     .sort((a, b) => Number(a.round) - Number(b.round));
+
+  const teamLogo = findTeamLogo(allFixtures, selectedTeam);
 
   const cachedLabel = cachedAt
     ? new Date(cachedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -508,24 +576,36 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
             {allFixtures.length} fixtures loaded
           </p>
           <p className="text-[9px] text-slate-400 font-medium mt-0.5">
-            {cachedLabel ? `Synced ${cachedLabel}` : 'Select a team to preview and save'}
+            {cachedLabel ? `Synced ${cachedLabel}` : 'Select your team to preview and save'}
           </p>
         </div>
-        <button onClick={startScrape} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-emjsc-navy text-[9px] font-black uppercase rounded-xl border border-slate-200 transition-colors">
+        <button onClick={() => setPhase({ tag: 'setup', url: competitionUrl })} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-emjsc-navy text-[9px] font-black uppercase rounded-xl border border-slate-200 transition-colors">
           <RefreshCw className="w-3 h-3" />Sync Again
         </button>
       </div>
 
       {/* Team selector */}
-      <select
-        value={selectedTeam}
-        onChange={e => setPhase({ ...phase, selectedTeam: e.target.value })}
-        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
-      >
-        {emjscTeams.map(t => (
-          <option key={t} value={t}>{emjscShortName(t)}</option>
-        ))}
-      </select>
+      <div className="space-y-2">
+        <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Select your team</p>
+        <div className="flex items-center gap-2">
+          {teamLogo && (
+            <img src={teamLogo} alt="" className="w-8 h-8 object-contain rounded shrink-0"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          )}
+          <select
+            value={selectedTeam}
+            onChange={e => setPhase({ ...phase, selectedTeam: e.target.value, savedCount: undefined })}
+            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
+          >
+            {allTeams.map(t => (
+              <option key={t} value={t}>{teamDisplayName(t)}</option>
+            ))}
+          </select>
+        </div>
+        {teamLogo && (
+          <p className="text-[9px] text-slate-400 font-medium">Team logo found — will update app logo on save</p>
+        )}
+      </div>
 
       {/* Fixture preview table */}
       {teamFixtures.length === 0 ? (
@@ -588,12 +668,12 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         </div>
       )}
 
-      {/* Success banner — shown inline, doesn't replace the view */}
+      {/* Success banner */}
       {savedCount !== undefined && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl">
           <Check className="w-4 h-4 text-green-600 shrink-0" />
           <p className="text-[10px] font-black uppercase tracking-[0.1em] text-green-700">
-            {savedCount} fixture{savedCount !== 1 ? 's' : ''} saved to database
+            {savedCount} fixture{savedCount !== 1 ? 's' : ''} saved · app logo updated
           </p>
         </div>
       )}
@@ -601,11 +681,11 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
       {/* Action row */}
       <div className="flex gap-2">
         <button
-          onClick={() => setPhase({ tag: 'idle' })}
+          onClick={() => setPhase({ tag: 'setup', url: competitionUrl })}
           disabled={saving}
           className="flex-1 bg-slate-100 text-slate-500 text-[10px] font-black uppercase py-3.5 rounded-2xl border border-slate-200 active:scale-[0.98] transition-all disabled:opacity-40"
         >
-          Cancel
+          Change URL
         </button>
         <button
           onClick={confirmSync}
@@ -613,7 +693,7 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
           className="flex-[2] bg-emjsc-navy text-white text-[10px] font-black uppercase py-3.5 rounded-2xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
-          {saving ? 'Saving…' : `Save ${teamFixtures.length} Fixture${teamFixtures.length !== 1 ? 's' : ''} to Database`}
+          {saving ? 'Saving…' : `Save ${teamFixtures.length} Fixture${teamFixtures.length !== 1 ? 's' : ''}`}
         </button>
       </div>
     </div>
