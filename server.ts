@@ -11,6 +11,14 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ── In-memory cache for Playwright-scraped data ──────────────────────────────
+// Persists for the lifetime of the server process; use ?refresh=true to bust.
+interface CacheEntry { data: any; cachedAt: string }
+const scraperCache = {
+  competitions: null as CacheEntry | null,
+  clubs: new Map<string, CacheEntry>(),
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -63,53 +71,71 @@ async function startServer() {
     }
   });
 
-  const DRIBL_HEADERS = {
-    'Accept': 'application/json',
-    'User-Agent': 'Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)',
-    'X-Tenant': 'w8zdBWPmBX',
-  };
-
-  // Dribl API — competitions for the FV tenant (optionally filtered by season)
-  app.get('/api/dribl/competitions', async (req, res) => {
-    const season = (req.query.season as string) || '';
-    try {
-      const r = await axios.get('https://mc-api.dribl.com/api/competitions', {
-        params: { tenant: 'w8zdBWPmBX', ...(season ? { season } : {}) },
-        headers: DRIBL_HEADERS,
-        timeout: 10_000,
-      });
-      const raw: any[] = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.competitions ?? []);
-      res.json({
-        competitions: raw.map((c: any) => ({
-          id: String(c.id ?? c.competition_id ?? ''),
-          name: String(c.name ?? c.competition_name ?? c.short_name ?? ''),
-          season: String(c.season_id ?? c.season ?? season),
-        })),
-      });
-    } catch (e: any) {
-      res.status(502).json({ error: `Competitions API returned ${e.response?.status ?? e.message}` });
+  // Playwright scraper — competitions for the FV tenant
+  // ?refresh=true bypasses the in-process cache and re-scrapes fv.dribl.com
+  app.get('/api/dribl/competitions', (req, res) => {
+    const refresh = req.query.refresh === 'true';
+    if (!refresh && scraperCache.competitions) {
+      console.log('[competitions] serving from cache');
+      return res.json({ ...scraperCache.competitions.data, cachedAt: scraperCache.competitions.cachedAt });
     }
+    const scriptPath = path.join(__dirname, 'scripts', 'scrape-dribl.mjs');
+    console.log('[competitions] spawning Playwright scraper');
+    execFile('node', [scriptPath, '--competitions', '--json'], {
+      timeout: 120_000,
+      maxBuffer: 5 * 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      if (stderr) console.error('[competitions stderr]', stderr.substring(0, 500));
+      if (err) {
+        console.error('[competitions] child error:', err.message);
+        return res.status(500).json({ error: err.message || 'Scrape failed' });
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        const cachedAt = new Date().toISOString();
+        scraperCache.competitions = { data: parsed, cachedAt };
+        res.json({ ...parsed, cachedAt });
+      } catch {
+        console.error('[competitions] parse error. stdout:', stdout.substring(0, 200));
+        res.status(500).json({ error: 'Failed to parse scraper output' });
+      }
+    });
   });
 
-  // Dribl API — clubs for a competition
-  app.get('/api/dribl/clubs', async (req, res) => {
-    const { season = '', competition = '' } = req.query as Record<string, string>;
-    try {
-      const r = await axios.get('https://mc-api.dribl.com/api/clubs', {
-        params: { tenant: 'w8zdBWPmBX', season, competition },
-        headers: DRIBL_HEADERS,
-        timeout: 10_000,
-      });
-      const raw: any[] = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.clubs ?? []);
-      res.json({
-        clubs: raw.map((c: any) => ({
-          id: String(c.id ?? c.club_id ?? ''),
-          name: String(c.name ?? c.club_name ?? c.short_name ?? ''),
-        })),
-      });
-    } catch (e: any) {
-      res.status(502).json({ error: `Clubs API returned ${e.response?.status ?? e.message}` });
+  // Playwright scraper — clubs for a competition
+  // ?refresh=true bypasses the in-process cache and re-scrapes fv.dribl.com
+  app.get('/api/dribl/clubs', (req, res) => {
+    const { season = '', competition = '', refresh } = req.query as Record<string, string>;
+    const cacheKey = `${season}:${competition}`;
+    if (refresh !== 'true' && scraperCache.clubs.has(cacheKey)) {
+      const entry = scraperCache.clubs.get(cacheKey)!;
+      console.log('[clubs] serving from cache', cacheKey);
+      return res.json({ ...entry.data, cachedAt: entry.cachedAt });
     }
+    const scriptPath = path.join(__dirname, 'scripts', 'scrape-dribl.mjs');
+    const args = ['--clubs', '--json'];
+    if (season) args.push('--season', season);
+    if (competition) args.push('--competition', competition);
+    console.log('[clubs] spawning Playwright scraper', { season, competition });
+    execFile('node', [scriptPath, ...args], {
+      timeout: 120_000,
+      maxBuffer: 5 * 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      if (stderr) console.error('[clubs stderr]', stderr.substring(0, 500));
+      if (err) {
+        console.error('[clubs] child error:', err.message);
+        return res.status(500).json({ error: err.message || 'Scrape failed' });
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        const cachedAt = new Date().toISOString();
+        scraperCache.clubs.set(cacheKey, { data: parsed, cachedAt });
+        res.json({ ...parsed, cachedAt });
+      } catch {
+        console.error('[clubs] parse error. stdout:', stdout.substring(0, 200));
+        res.status(500).json({ error: 'Failed to parse scraper output' });
+      }
+    });
   });
 
   // Playwright scraper for Dribl fixture page (logos + map links).

@@ -380,6 +380,10 @@ export type DriblCache = {
   savedAt: string;
   competition?: DriblCompetition;
   club?: DriblClub;
+  availableCompetitions?: DriblCompetition[];
+  availableClubs?: { [competitionId: string]: DriblClub[] };
+  listsCachedAt?: string;
+  fixtureCache?: { [key: string]: { fixtures: any[]; allTeams: string[]; scrapedAt: string } };
 };
 
 function extractClubName(fullName: string): string {
@@ -412,7 +416,7 @@ function findTeamLogo(fixtures: any[], teamName: string): string | null {
 
 function buildFixtureUrl(competition: DriblCompetition, club: DriblClub): string {
   const p = new URLSearchParams({
-    date_range: 'default',
+    date_range: 'all',
     season: competition.season,
     competition: competition.id,
     club: club.id,
@@ -422,75 +426,177 @@ function buildFixtureUrl(competition: DriblCompetition, club: DriblClub): string
 }
 
 type ScrapePhase =
-  | { tag: 'select'; loadingComps: boolean; competitions: DriblCompetition[]; compId: string; loadingClubs: boolean; clubs: DriblClub[]; clubId: string; error?: string }
+  | { tag: 'select'; loadingComps: boolean; competitions: DriblCompetition[]; compId: string; loadingClubs: boolean; clubs: DriblClub[]; clubId: string; compsCachedAt?: string; clubsCachedAt?: string; error?: string }
   | { tag: 'syncing'; competition: DriblCompetition; club: DriblClub }
   | { tag: 'preview'; competition: DriblCompetition; club: DriblClub; allFixtures: any[]; allTeams: string[]; selectedTeamClub: string; selectedTeam: string; cachedAt?: string; saving?: boolean; savedCount?: number }
   | { tag: 'error'; message: string };
 
 function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onConfirmSync, driblCache, onSaveDriblCache }: {
-  onFetchCompetitions: () => Promise<{ competitions: DriblCompetition[] }>;
-  onFetchClubs: (competitionId: string, season: string) => Promise<{ clubs: DriblClub[] }>;
+  onFetchCompetitions: (forceRefresh?: boolean) => Promise<{ competitions: DriblCompetition[]; cachedAt?: string }>;
+  onFetchClubs: (competitionId: string, season: string, forceRefresh?: boolean) => Promise<{ clubs: DriblClub[]; cachedAt?: string }>;
   onFetchDribl: (url: string) => Promise<{ fixtures: any[]; debug: any } | null>;
   onConfirmSync: (fixtures: any[], teamName: string, teamLogoUrl?: string) => Promise<void>;
   driblCache: DriblCache | null;
   onSaveDriblCache: (cache: DriblCache) => Promise<void>;
 }) {
   const initPhase = (): ScrapePhase => {
-    if (driblCache?.fixtures.length && driblCache.competition && driblCache.club) {
+    if (driblCache?.fixtures?.length && driblCache.competition && driblCache.club) {
       const selectedTeam = driblCache.selectedTeam;
       const selectedTeamClub = driblCache.selectedClub || extractClubName(selectedTeam);
       return { tag: 'preview', competition: driblCache.competition, club: driblCache.club, allFixtures: driblCache.fixtures, allTeams: driblCache.allTeams, selectedTeamClub, selectedTeam, cachedAt: driblCache.savedAt };
     }
-    return { tag: 'select', loadingComps: true, competitions: [], compId: '', loadingClubs: false, clubs: [], clubId: '' };
+    // Start empty — Firestore restore effect will populate once the snapshot arrives
+    return { tag: 'select', loadingComps: false, competitions: [], compId: '', loadingClubs: false, clubs: [], clubId: '' };
   };
 
   const [phase, setPhase] = React.useState<ScrapePhase>(initPhase);
 
-  // Restore from Firestore cache once it loads asynchronously
+  // Persists across phase transitions so going back to select is instant.
+  const listsRef = React.useRef<{
+    competitions: DriblCompetition[];
+    compsCachedAt?: string;
+    clubsByCompId: Map<string, { clubs: DriblClub[]; cachedAt?: string }>;
+  }>({ competitions: [], clubsByCompId: new Map() });
+
+  // Populate from Firestore once the snapshot arrives (or whenever cache updates).
+  // Handles both preview restoration and competition/club list hydration.
   React.useEffect(() => {
-    if (!driblCache?.fixtures.length || !driblCache.competition || !driblCache.club) return;
+    if (!driblCache) return;
+
+    // Hydrate the in-memory ref so resetToSelect() is instant
+    if (driblCache.availableCompetitions?.length) {
+      listsRef.current.competitions = driblCache.availableCompetitions;
+      listsRef.current.compsCachedAt = driblCache.listsCachedAt;
+      if (driblCache.availableClubs) {
+        for (const [id, clubs] of Object.entries(driblCache.availableClubs)) {
+          if (!listsRef.current.clubsByCompId.has(id)) {
+            listsRef.current.clubsByCompId.set(id, { clubs, cachedAt: driblCache.listsCachedAt });
+          }
+        }
+      }
+    }
+
     setPhase(prev => {
-      if (prev.tag !== 'select') return prev;
-      const selectedTeam = driblCache.selectedTeam;
-      const selectedTeamClub = driblCache.selectedClub || extractClubName(selectedTeam);
-      return { tag: 'preview', competition: driblCache.competition!, club: driblCache.club!, allFixtures: driblCache.fixtures, allTeams: driblCache.allTeams, selectedTeamClub, selectedTeam, cachedAt: driblCache.savedAt };
+      // Don't overwrite a phase that's already meaningful
+      if (prev.tag !== 'select' || prev.competitions.length > 0 || prev.loadingComps) return prev;
+
+      // Restore to preview if fixtures are synced
+      if (driblCache.fixtures?.length && driblCache.competition && driblCache.club) {
+        const selectedTeam = driblCache.selectedTeam;
+        const selectedTeamClub = driblCache.selectedClub || extractClubName(selectedTeam);
+        return { tag: 'preview', competition: driblCache.competition!, club: driblCache.club!, allFixtures: driblCache.fixtures, allTeams: driblCache.allTeams, selectedTeamClub, selectedTeam, cachedAt: driblCache.savedAt };
+      }
+
+      // Populate select phase from cached lists
+      if (driblCache.availableCompetitions?.length) {
+        const competitions = driblCache.availableCompetitions;
+        const prefCompId = driblCache.competition?.id || competitions[0]?.id || '';
+        const cachedClubs = driblCache.availableClubs?.[prefCompId];
+        return {
+          tag: 'select',
+          loadingComps: false,
+          competitions,
+          compId: prefCompId,
+          compsCachedAt: driblCache.listsCachedAt,
+          loadingClubs: !cachedClubs,
+          clubs: cachedClubs ?? [],
+          clubId: driblCache.club?.id || cachedClubs?.[0]?.id || '',
+          clubsCachedAt: cachedClubs ? driblCache.listsCachedAt : undefined,
+        };
+      }
+
+      return prev;
     });
   }, [driblCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadClubs = React.useCallback(async (competition: DriblCompetition, compIdToSet: string) => {
-    setPhase(prev => prev.tag === 'select' ? { ...prev, compId: compIdToSet, loadingClubs: true, clubs: [], clubId: '', error: undefined } : prev);
+  const loadClubs = React.useCallback(async (competition: DriblCompetition, compIdToSet: string, forceRefresh = false) => {
+    setPhase(prev => prev.tag === 'select' ? { ...prev, compId: compIdToSet, loadingClubs: true, clubs: [], clubId: '', clubsCachedAt: undefined, error: undefined } : prev);
     try {
-      const { clubs } = await onFetchClubs(competition.id, competition.season);
-      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: false, clubs, clubId: clubs[0]?.id ?? '' } : prev);
+      const { clubs, cachedAt } = await onFetchClubs(competition.id, competition.season, forceRefresh);
+      listsRef.current.clubsByCompId.set(competition.id, { clubs, cachedAt });
+      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: false, clubs, clubId: clubs[0]?.id ?? '', clubsCachedAt: cachedAt } : prev);
     } catch (err: any) {
       setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: false, error: `Failed to load clubs: ${err.message}` } : prev);
     }
   }, [onFetchClubs]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load competitions on mount when in select phase
+  // Auto-load clubs on mount when competitions are known but clubs aren't cached yet
   React.useEffect(() => {
-    if (phase.tag !== 'select' || !phase.loadingComps) return;
-    onFetchCompetitions()
-      .then(({ competitions }) => {
-        setPhase(prev => prev.tag === 'select' ? { ...prev, loadingComps: false, competitions, compId: competitions[0]?.id ?? '' } : prev);
-        if (competitions[0]) loadClubs(competitions[0], competitions[0].id);
-      })
-      .catch((err: any) => {
-        setPhase(prev => prev.tag === 'select' ? { ...prev, loadingComps: false, error: err.message } : prev);
-      });
+    if (phase.tag !== 'select' || !phase.loadingClubs || !phase.compId || !phase.competitions.length) return;
+    const competition = phase.competitions.find(c => c.id === phase.compId);
+    if (competition) loadClubs(competition, phase.compId);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeCompetition = (compId: string) => {
     if (phase.tag !== 'select') return;
     const competition = phase.competitions.find(c => c.id === compId);
-    if (competition) loadClubs(competition, compId);
+    if (!competition) return;
+    const cached = listsRef.current.clubsByCompId.get(compId);
+    if (cached) {
+      setPhase(prev => prev.tag === 'select' ? { ...prev, compId, loadingClubs: false, clubs: cached.clubs, clubId: cached.clubs[0]?.id ?? '', clubsCachedAt: cached.cachedAt, error: undefined } : prev);
+    } else {
+      loadClubs(competition, compId);
+    }
   };
 
-  const startSync = async () => {
+  const refreshClubs = async () => {
+    if (phase.tag !== 'select' || phase.loadingClubs) return;
+    const competition = phase.competitions.find(c => c.id === phase.compId);
+    if (!competition) return;
+    setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: true, clubs: [], clubsCachedAt: undefined, error: undefined } : prev);
+    try {
+      const { clubs, cachedAt } = await onFetchClubs(competition.id, competition.season, true);
+      listsRef.current.clubsByCompId.set(competition.id, { clubs, cachedAt });
+      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: false, clubs, clubId: clubs.find(c => c.id === (prev.tag === 'select' ? prev.clubId : ''))?.id ?? clubs[0]?.id ?? '', clubsCachedAt: cachedAt } : prev);
+      const newAvailableClubs = { ...(driblCache?.availableClubs ?? {}), [competition.id]: clubs };
+      await onSaveDriblCache({
+        ...(driblCache ?? { fixtures: [], allTeams: [], selectedTeam: '', savedAt: new Date().toISOString() }),
+        availableClubs: newAvailableClubs,
+        listsCachedAt: cachedAt,
+      });
+    } catch (err: any) {
+      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingClubs: false, error: `Failed to refresh clubs: ${err.message}` } : prev);
+    }
+  };
+
+  const refreshCompetitions = async () => {
+    if (phase.tag !== 'select' || phase.loadingComps) return;
+    setPhase(prev => prev.tag === 'select' ? { ...prev, loadingComps: true, competitions: [], compsCachedAt: undefined } : prev);
+    try {
+      const { competitions, cachedAt } = await onFetchCompetitions(true);
+      listsRef.current.competitions = competitions;
+      listsRef.current.compsCachedAt = cachedAt;
+      listsRef.current.clubsByCompId.clear();
+      const compId = competitions[0]?.id ?? '';
+      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingComps: false, competitions, compId, compsCachedAt: cachedAt } : prev);
+      await onSaveDriblCache({
+        ...(driblCache ?? { fixtures: [], allTeams: [], selectedTeam: '', savedAt: new Date().toISOString() }),
+        availableCompetitions: competitions,
+        availableClubs: {},
+        listsCachedAt: cachedAt,
+      });
+      if (competitions[0]) loadClubs(competitions[0], compId, true);
+    } catch (err: any) {
+      setPhase(prev => prev.tag === 'select' ? { ...prev, loadingComps: false, error: err.message } : prev);
+    }
+  };
+
+  const startSync = async (forceRefresh = false) => {
     if (phase.tag !== 'select') return;
     const competition = phase.competitions.find(c => c.id === phase.compId);
     const club = phase.clubs.find(c => c.id === phase.clubId);
     if (!competition || !club) return;
+
+    const cacheKey = `${competition.id}:${club.id}`;
+    const cachedEntry = !forceRefresh ? driblCache?.fixtureCache?.[cacheKey] : null;
+
+    if (cachedEntry) {
+      const ourTeams = cachedEntry.allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
+      const firstTeam = ourTeams[0] ?? cachedEntry.allTeams[0] ?? '';
+      setPhase({ tag: 'preview', competition, club, allFixtures: cachedEntry.fixtures, allTeams: cachedEntry.allTeams, selectedTeamClub: extractClubName(firstTeam), selectedTeam: firstTeam, cachedAt: cachedEntry.scrapedAt });
+      return;
+    }
+
     setPhase({ tag: 'syncing', competition, club });
     const url = buildFixtureUrl(competition, club);
     try {
@@ -508,9 +614,11 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
       const ourTeams = allTeams.filter(t => extractClubName(t).toLowerCase() === club.name.toLowerCase());
       const firstTeam = ourTeams[0] ?? allTeams[0] ?? '';
       const selectedTeamClub = extractClubName(firstTeam);
-      const cache: DriblCache = { fixtures: result.fixtures, allTeams, selectedClub: selectedTeamClub, selectedTeam: firstTeam, savedAt: new Date().toISOString(), competition, club };
+      const scrapedAt = new Date().toISOString();
+      const newFixtureCache = { ...(driblCache?.fixtureCache ?? {}), [cacheKey]: { fixtures: result.fixtures, allTeams, scrapedAt } };
+      const cache: DriblCache = { fixtures: result.fixtures, allTeams, selectedClub: selectedTeamClub, selectedTeam: firstTeam, savedAt: scrapedAt, competition, club, fixtureCache: newFixtureCache };
       await onSaveDriblCache(cache);
-      setPhase({ tag: 'preview', competition, club, allFixtures: result.fixtures, allTeams, selectedTeamClub, selectedTeam: firstTeam, cachedAt: cache.savedAt });
+      setPhase({ tag: 'preview', competition, club, allFixtures: result.fixtures, allTeams, selectedTeamClub, selectedTeam: firstTeam, cachedAt: scrapedAt });
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Sync failed' });
     }
@@ -530,12 +638,47 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
     }
   };
 
-  const resetToSelect = () => setPhase({ tag: 'select', loadingComps: true, competitions: [], compId: '', loadingClubs: false, clubs: [], clubId: '' });
+  const resetToSelect = () => {
+    const lists = listsRef.current;
+    if (lists.competitions.length > 0) {
+      const prefCompId = phase.tag === 'preview' ? phase.competition.id : lists.competitions[0]?.id ?? '';
+      const prefClubId = phase.tag === 'preview' ? phase.club.id : '';
+      const cachedClubs = lists.clubsByCompId.get(prefCompId);
+      const clubId = cachedClubs?.clubs.find(c => c.id === prefClubId)?.id ?? cachedClubs?.clubs[0]?.id ?? '';
+      setPhase({
+        tag: 'select',
+        loadingComps: false,
+        competitions: lists.competitions,
+        compId: prefCompId,
+        compsCachedAt: lists.compsCachedAt,
+        loadingClubs: !cachedClubs,
+        clubs: cachedClubs?.clubs ?? [],
+        clubId,
+        clubsCachedAt: cachedClubs?.cachedAt,
+      });
+      if (!cachedClubs) {
+        const comp = lists.competitions.find(c => c.id === prefCompId);
+        if (comp) loadClubs(comp, prefCompId);
+      }
+    } else {
+      setPhase({ tag: 'select', loadingComps: false, competitions: [], compId: '', loadingClubs: false, clubs: [], clubId: '', compsCachedAt: undefined, clubsCachedAt: undefined });
+    }
+  };
 
   // ── Select phase ──
   if (phase.tag === 'select') {
-    const { loadingComps, competitions, compId, loadingClubs, clubs, clubId, error } = phase;
+    const { loadingComps, competitions, compId, loadingClubs, clubs, clubId, compsCachedAt, clubsCachedAt, error } = phase;
     const canSync = !loadingComps && !loadingClubs && compId && clubId;
+
+    const fmtCachedAt = (iso?: string) => {
+      if (!iso) return null;
+      const diff = Date.now() - new Date(iso).getTime();
+      if (diff < 60_000) return 'just now';
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+      return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    };
+
     return (
       <div className="space-y-4">
         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emjsc-navy">Sync Fixtures</p>
@@ -550,19 +693,38 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
 
         {/* Competition */}
         <div className="space-y-1.5">
-          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">1. Competition</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">1. Competition</p>
+            {!loadingComps && competitions.length > 0 && (
+              <button
+                onClick={refreshCompetitions}
+                className="flex items-center gap-1 text-[8px] font-black uppercase text-slate-400 hover:text-emjsc-navy transition-colors"
+                title="Re-sync competition list from FV website"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                {compsCachedAt ? fmtCachedAt(compsCachedAt) : 'Refresh'}
+              </button>
+            )}
+          </div>
           {loadingComps ? (
             <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
               <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin shrink-0" />
-              <span className="text-[9px] text-slate-400 font-medium">Loading competitions…</span>
+              <span className="text-[9px] text-slate-400 font-medium">Loading from FV…</span>
             </div>
+          ) : competitions.length === 0 ? (
+            <button
+              onClick={refreshCompetitions}
+              className="w-full flex items-center justify-center gap-2 p-3 bg-slate-50 border border-slate-200 border-dashed rounded-2xl text-[9px] font-black uppercase text-slate-400 hover:text-emjsc-navy hover:border-emjsc-navy/40 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Load competitions from FV
+            </button>
           ) : (
             <select
               value={compId}
               onChange={e => changeCompetition(e.target.value)}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
             >
-              {competitions.length === 0 && <option value="">No competitions found</option>}
               {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
@@ -570,16 +732,28 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
 
         {/* Club */}
         <div className="space-y-1.5">
-          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">2. Club</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">2. Club</p>
+            {!loadingClubs && clubs.length > 0 && (
+              <button
+                onClick={refreshClubs}
+                className="flex items-center gap-1 text-[8px] font-black uppercase text-slate-400 hover:text-emjsc-navy transition-colors"
+                title="Refresh clubs from FV website"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                {clubsCachedAt ? fmtCachedAt(clubsCachedAt) : 'Refresh'}
+              </button>
+            )}
+          </div>
           {loadingClubs ? (
             <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
               <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin shrink-0" />
-              <span className="text-[9px] text-slate-400 font-medium">Loading clubs…</span>
+              <span className="text-[9px] text-slate-400 font-medium">Loading clubs from FV…</span>
             </div>
           ) : (
             <select
               value={clubId}
-              onChange={e => setPhase({ ...phase, clubId: e.target.value })}
+              onChange={e => setPhase(prev => prev.tag === 'select' ? { ...prev, clubId: e.target.value } : prev)}
               disabled={clubs.length === 0}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy disabled:opacity-40"
             >
@@ -589,13 +763,29 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
           )}
         </div>
 
+        {(() => {
+          const fixtureEntry = compId && clubId ? driblCache?.fixtureCache?.[`${compId}:${clubId}`] : null;
+          return fixtureEntry ? (
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[8px] font-black uppercase text-slate-400">Cached {fmtCachedAt(fixtureEntry.scrapedAt)}</span>
+              <button
+                onClick={() => startSync(true)}
+                className="flex items-center gap-1 text-[8px] font-black uppercase text-slate-400 hover:text-emjsc-navy transition-colors"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                Force re-scrape
+              </button>
+            </div>
+          ) : null;
+        })()}
+
         <button
-          onClick={startSync}
+          onClick={() => startSync()}
           disabled={!canSync}
           className="w-full bg-emjsc-navy text-white text-[10px] font-black uppercase py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3 disabled:opacity-40"
         >
           <Zap className="w-4 h-4 text-yellow-300" />
-          3. Sync Fixtures
+          Sync Fixtures
         </button>
 
         {driblCache?.fixtures.length && driblCache.competition && driblCache.club && (
@@ -606,7 +796,7 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
             }}
             className="w-full bg-slate-50 text-slate-400 text-[9px] font-black uppercase py-2.5 rounded-2xl border border-slate-200"
           >
-            Use Cached Data ({driblCache.club.name})
+            Cancel
           </button>
         )}
       </div>
@@ -655,7 +845,7 @@ function DriblScrapePanel({ onFetchCompetitions, onFetchClubs, onFetchDribl, onC
           <p className="text-[9px] text-slate-400 font-medium mt-0.5">{cachedLabel ? `Synced ${cachedLabel}` : `${allFixtures.length} fixtures`}</p>
         </div>
         <button onClick={resetToSelect} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-emjsc-navy text-[9px] font-black uppercase rounded-xl border border-slate-200 transition-colors">
-          <RefreshCw className="w-3 h-3" />Re-sync
+          <RefreshCw className="w-3 h-3" />Change
         </button>
       </div>
 

@@ -175,38 +175,285 @@ export async function scrapeDriblFixtures(url = DRIBL_URL) {
   }
 }
 
+// ── Competition scraper ──────────────────────────────────────────────────────
+
+/**
+ * Scrapes all competitions from fv.dribl.com by intercepting the API responses
+ * the website makes when rendering its filter dropdowns.
+ * Uses headless:true + stealth plugin.
+ * @returns {{ competitions: Array<{id: string, name: string, season: string}>, debug: object }}
+ */
+export async function scrapeCompetitions() {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  const found = [];
+  const debug = { intercepted: [], error: null };
+
+  // Track the season ID from the seasons API response so we can attach it to competitions
+  let defaultSeasonId = '';
+
+  page.on('response', async (response) => {
+    const url = response.url();
+    if (!url.includes('mc-api.dribl.com')) return;
+    debug.intercepted.push(url);
+    try {
+      const ct = response.headers()['content-type'] ?? '';
+      if (!ct.includes('application/json')) return;
+
+      // Capture the default season ID from the seasons endpoint
+      if (url.includes('/seasons') && !defaultSeasonId) {
+        const data = await response.json();
+        const raw = Array.isArray(data) ? data : (data?.data ?? []);
+        if (raw.length > 0) defaultSeasonId = String(raw[0]?.id ?? '');
+        return;
+      }
+
+      // Only process the competitions list endpoint
+      if (!url.match(/\/(?:list\/)?competitions/)) return;
+
+      const data = await response.json();
+      const raw = Array.isArray(data) ? data : (data?.data ?? data?.competitions ?? []);
+      if (!Array.isArray(raw) || raw.length === 0) return;
+      for (const c of raw) {
+        const id = String(c.id ?? c.competition_id ?? '');
+        const name = String(c.name ?? c.competition_name ?? c.short_name ?? '');
+        // season comes from the URL param on the competitions request
+        const seasonMatch = url.match(/[?&]season=([^&]+)/);
+        const season = seasonMatch ? decodeURIComponent(seasonMatch[1]) : defaultSeasonId;
+        if (id && name && !found.some(f => f.id === id)) {
+          found.push({ id, name, season });
+        }
+      }
+    } catch {}
+  });
+
+  try {
+    await page.goto(
+      'https://fv.dribl.com/fixtures/?date_range=default&timezone=Australia%2FMelbourne',
+      { waitUntil: 'networkidle', timeout: 30_000 }
+    );
+    await page.waitForTimeout(3_000);
+
+    // Fallback: if network didn't yield competitions, try clicking the dropdown
+    if (found.length === 0) {
+      const items = await scrapeDropdownItems(page, 'competition');
+      for (const { name, url: itemUrl } of items) {
+        const idMatch = itemUrl.match(/[?&]competition=([^&]+)/);
+        const seasonMatch = itemUrl.match(/[?&]season=([^&]+)/);
+        if (idMatch) found.push({ id: idMatch[1], name, season: seasonMatch?.[1] ?? '' });
+      }
+    }
+
+    return { competitions: found, debug };
+  } catch (err) {
+    debug.error = err.message;
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ── Club scraper ─────────────────────────────────────────────────────────────
+
+/**
+ * Scrapes clubs for a competition from fv.dribl.com via network interception.
+ * Uses headless:true + stealth plugin.
+ * @param {string} seasonId
+ * @param {string} competitionId
+ * @returns {{ clubs: Array<{id: string, name: string}>, debug: object }}
+ */
+export async function scrapeClubsForCompetition(seasonId, competitionId) {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  const found = [];
+  const debug = { seasonId, competitionId, intercepted: [], error: null };
+
+  // Capture the competition-filtered clubs endpoint (fixtures-clubs?competition=X).
+  // The page also requests list/clubs (all clubs), which we skip.
+  page.on('response', async (response) => {
+    const url = response.url();
+    if (!url.includes('mc-api.dribl.com')) return;
+    // Only process competition-specific club lists
+    if (!url.includes('fixtures-clubs')) return;
+    if (!url.includes(`competition=${competitionId}`)) return;
+    debug.intercepted.push(url);
+    try {
+      const ct = response.headers()['content-type'] ?? '';
+      if (!ct.includes('application/json')) return;
+      const buf = await response.body();
+      const data = JSON.parse(buf.toString());
+      const raw = Array.isArray(data) ? data : (data?.data ?? data?.clubs ?? []);
+      if (!Array.isArray(raw) || raw.length === 0) return;
+      for (const c of raw) {
+        const id = String(c.id ?? c.club_id ?? '');
+        // JSON:API format: name is in attributes; flat format: directly on object
+        const name = String(c.attributes?.name ?? c.name ?? c.club_name ?? c.short_name ?? '');
+        if (id && name && !found.some(f => f.id === id)) {
+          found.push({ id, name });
+        }
+      }
+    } catch (e) {
+      debug.handlerError = e.message;
+    }
+  });
+
+  try {
+    const pageUrl = `https://fv.dribl.com/fixtures/?date_range=default&season=${encodeURIComponent(seasonId)}&competition=${encodeURIComponent(competitionId)}&timezone=Australia%2FMelbourne`;
+    debug.url = pageUrl;
+    await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 30_000 });
+    await page.waitForTimeout(3_000);
+
+    return { clubs: found, debug };
+  } catch (err) {
+    debug.error = err.message;
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * Fallback: open a Vuetify filter dropdown, click each option, and capture the
+ * resulting URL change to extract the option's ID.
+ * @param {import('playwright').Page} page  Already-loaded fv.dribl.com page.
+ * @param {'competition'|'club'} filterType
+ * @returns {Promise<Array<{name: string, url: string}>>}
+ */
+async function scrapeDropdownItems(page, filterType) {
+  const paramKey = filterType === 'competition' ? 'competition' : 'club';
+  const results = [];
+  try {
+    // Vuetify v-select trigger — look for an input whose adjacent label mentions the filter type
+    const trigger = await page.evaluateHandle((type) => {
+      const labels = Array.from(document.querySelectorAll('label, .v-label'));
+      for (const lbl of labels) {
+        if (lbl.textContent?.toLowerCase().includes(type)) {
+          const parent = lbl.closest('.v-input, .v-select, .v-autocomplete');
+          if (parent) return parent.querySelector('input, .v-select__slot, .v-field__input') ?? parent;
+        }
+      }
+      return null;
+    }, filterType);
+
+    const el = trigger.asElement();
+    if (!el) return results;
+
+    await el.click();
+    await page.waitForTimeout(1_000);
+
+    // Read all visible list items
+    const names = await page.$$eval(
+      '.v-menu__content .v-list-item__title, .v-overlay__content .v-list-item__title, ' +
+      '.v-menu__content .v-list-item, .v-overlay__content .v-list-item',
+      els => els.map(e => e.textContent?.trim()).filter(Boolean)
+    );
+    if (names.length === 0) return results;
+
+    for (const name of names) {
+      // Click the matching item
+      const clicked = await page.evaluate((n) => {
+        const selectors = [
+          '.v-menu__content .v-list-item__title',
+          '.v-overlay__content .v-list-item__title',
+          '.v-menu__content .v-list-item',
+          '.v-overlay__content .v-list-item',
+        ];
+        for (const sel of selectors) {
+          const el = Array.from(document.querySelectorAll(sel))
+            .find(e => e.textContent?.trim() === n);
+          if (el) { el.click(); return true; }
+        }
+        return false;
+      }, name);
+
+      if (!clicked) continue;
+
+      // Wait for URL to include the expected param
+      try {
+        await page.waitForURL(u => u.includes(`${paramKey}=`), { timeout: 4_000 });
+        results.push({ name, url: page.url() });
+      } catch {}
+
+      // Re-open dropdown for the next item
+      await el.click();
+      await page.waitForTimeout(500);
+    }
+  } catch {}
+  return results;
+}
+
 // ── CLI entry point ──────────────────────────────────────────────────────────
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const jsonMode = process.argv.includes('--json');
-  const urlIdx = process.argv.indexOf('--url');
-  const cliUrl = urlIdx !== -1 ? process.argv[urlIdx + 1] : DRIBL_URL;
+  const mode = process.argv.includes('--competitions') ? 'competitions'
+    : process.argv.includes('--clubs') ? 'clubs'
+    : 'fixtures';
 
-  if (jsonMode) {
-    // Machine-readable mode: emit only a single JSON line to stdout.
-    scrapeDriblFixtures(cliUrl)
-      .then(result => { process.stdout.write(JSON.stringify(result) + '\n'); })
-      .catch(err => {
-        process.stdout.write(JSON.stringify({ fixtures: [], debug: { error: err.message } }) + '\n');
-        process.exit(1);
-      });
-  } else {
-    // Human-readable mode for direct CLI use.
-    console.log('Scraping Dribl fixtures…');
-    scrapeDriblFixtures(cliUrl)
-      .then(({ fixtures, debug }) => {
-        console.log('\n── Debug ──');
-        console.log(JSON.stringify(debug, null, 2));
-        console.log(`\n── All fixtures (${fixtures.length}) ──`);
-        const target = fixtures.filter(f =>
-          (f.home_team_name || '').includes('EMJSC U8 Saturday White') ||
-          (f.away_team_name || '').includes('EMJSC U8 Saturday White')
-        );
-        console.log(`EMJSC U8 Saturday White fixtures: ${target.length}`);
-        console.log(JSON.stringify(target, null, 2));
+  if (mode === 'competitions') {
+    scrapeCompetitions()
+      .then(result => {
+        if (jsonMode) {
+          process.stdout.write(JSON.stringify(result) + '\n');
+        } else {
+          console.log(`Competitions (${result.competitions.length}):`);
+          result.competitions.forEach(c => console.log(`  ${c.id}  ${c.name}  season=${c.season}`));
+        }
       })
       .catch(err => {
-        console.error('Scrape failed:', err.message);
+        if (jsonMode) process.stdout.write(JSON.stringify({ competitions: [], debug: { error: err.message } }) + '\n');
+        else console.error('Failed:', err.message);
         process.exit(1);
       });
+
+  } else if (mode === 'clubs') {
+    const seasonIdx = process.argv.indexOf('--season');
+    const compIdx = process.argv.indexOf('--competition');
+    const seasonId = seasonIdx !== -1 ? process.argv[seasonIdx + 1] : '';
+    const competitionId = compIdx !== -1 ? process.argv[compIdx + 1] : '';
+    scrapeClubsForCompetition(seasonId, competitionId)
+      .then(result => {
+        if (jsonMode) {
+          process.stdout.write(JSON.stringify(result) + '\n');
+        } else {
+          console.log(`Clubs (${result.clubs.length}):`);
+          result.clubs.forEach(c => console.log(`  ${c.id}  ${c.name}`));
+        }
+      })
+      .catch(err => {
+        if (jsonMode) process.stdout.write(JSON.stringify({ clubs: [], debug: { error: err.message } }) + '\n');
+        else console.error('Failed:', err.message);
+        process.exit(1);
+      });
+
+  } else {
+    const urlIdx = process.argv.indexOf('--url');
+    const cliUrl = urlIdx !== -1 ? process.argv[urlIdx + 1] : DRIBL_URL;
+
+    if (jsonMode) {
+      scrapeDriblFixtures(cliUrl)
+        .then(result => { process.stdout.write(JSON.stringify(result) + '\n'); })
+        .catch(err => {
+          process.stdout.write(JSON.stringify({ fixtures: [], debug: { error: err.message } }) + '\n');
+          process.exit(1);
+        });
+    } else {
+      console.log('Scraping Dribl fixtures…');
+      scrapeDriblFixtures(cliUrl)
+        .then(({ fixtures, debug }) => {
+          console.log('\n── Debug ──');
+          console.log(JSON.stringify(debug, null, 2));
+          console.log(`\n── All fixtures (${fixtures.length}) ──`);
+          const target = fixtures.filter(f =>
+            (f.home_team_name || '').includes('EMJSC U8 Saturday White') ||
+            (f.away_team_name || '').includes('EMJSC U8 Saturday White')
+          );
+          console.log(`EMJSC U8 Saturday White fixtures: ${target.length}`);
+          console.log(JSON.stringify(target, null, 2));
+        })
+        .catch(err => {
+          console.error('Scrape failed:', err.message);
+          process.exit(1);
+        });
+    }
   }
 }

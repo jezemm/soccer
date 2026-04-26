@@ -260,6 +260,10 @@ export default function App() {
           savedAt: data.savedAt || new Date().toISOString(),
           competition: data.competition || undefined,
           club: data.club || undefined,
+          availableCompetitions: data.availableCompetitions || undefined,
+          availableClubs: data.availableClubs || undefined,
+          listsCachedAt: data.listsCachedAt || undefined,
+          fixtureCache: data.fixtureCache || undefined,
         });
       }
     });
@@ -1368,8 +1372,9 @@ export default function App() {
     }
   };
 
-  const fetchDriblCompetitions = async (): Promise<{ competitions: import('./components/AdminView').DriblCompetition[] }> => {
-    const res = await fetch('/api/dribl/competitions');
+  const fetchDriblCompetitions = async (forceRefresh = false): Promise<{ competitions: import('./components/AdminView').DriblCompetition[]; cachedAt?: string }> => {
+    const url = forceRefresh ? '/api/dribl/competitions?refresh=true' : '/api/dribl/competitions';
+    const res = await fetch(url);
     requiresDevServer(res);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -1378,8 +1383,10 @@ export default function App() {
     return res.json();
   };
 
-  const fetchDriblClubs = async (competitionId: string, season: string): Promise<{ clubs: import('./components/AdminView').DriblClub[] }> => {
-    const res = await fetch(`/api/dribl/clubs?competition=${encodeURIComponent(competitionId)}&season=${encodeURIComponent(season)}`);
+  const fetchDriblClubs = async (competitionId: string, season: string, forceRefresh = false): Promise<{ clubs: import('./components/AdminView').DriblClub[]; cachedAt?: string }> => {
+    const params = new URLSearchParams({ competition: competitionId, season });
+    if (forceRefresh) params.set('refresh', 'true');
+    const res = await fetch(`/api/dribl/clubs?${params}`);
     requiresDevServer(res);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -1414,7 +1421,7 @@ export default function App() {
 
   const saveDriblCache = async (cache: import('./components/AdminView').DriblCache) => {
     try {
-      await setDoc(doc(db, 'settings', 'driblCache'), {
+      const data: Record<string, any> = {
         fixtures: cache.fixtures,
         allTeams: cache.allTeams,
         selectedClub: cache.selectedClub || '',
@@ -1422,7 +1429,14 @@ export default function App() {
         savedAt: cache.savedAt,
         competition: cache.competition || null,
         club: cache.club || null,
-      });
+      };
+      if (cache.availableCompetitions !== undefined) data.availableCompetitions = cache.availableCompetitions;
+      if (cache.availableClubs !== undefined) data.availableClubs = cache.availableClubs;
+      if (cache.listsCachedAt !== undefined) data.listsCachedAt = cache.listsCachedAt;
+      if (cache.fixtureCache !== undefined) data.fixtureCache = cache.fixtureCache;
+      // merge:true so fields not present in `data` (e.g. availableCompetitions when only
+      // saving fixtures) are preserved in Firestore rather than deleted.
+      await setDoc(doc(db, 'settings', 'driblCache'), data, { merge: true });
     } catch (err) {
       console.error('saveDriblCache error:', err);
     }
@@ -1469,6 +1483,18 @@ export default function App() {
     }
   };
 
+  const appClubName = driblCache?.selectedClub || '';
+  const appTeamDisplay = (() => {
+    let name = driblCache?.selectedTeam ?? '';
+    if (!name) return '';
+    name = name.replace(/\s*U\d{2,3}\s+MiniRoos\s*-\s*Joeys Mixed\s*/i, ' ').replace(/\s+/g, ' ').trim();
+    if (appClubName && name.toLowerCase().startsWith(appClubName.toLowerCase())) {
+      name = name.slice(appClubName.length).trim();
+    }
+    return name;
+  })();
+  const appHubTitle = appClubName ? `${appClubName} Hub` : 'EMJSC Hub';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1510,7 +1536,7 @@ export default function App() {
             referrerPolicy="no-referrer"
           />
           <div className="space-y-2">
-            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
+            <h1 className="text-3xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
             <p className="text-slate-500 text-sm font-bold italic">
               {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
@@ -1680,8 +1706,8 @@ export default function App() {
               referrerPolicy="no-referrer"
             />
             <div>
-              <h1 className="text-lg font-black tracking-tight text-emjsc-navy leading-none uppercase">EMJSC Hub</h1>
-              <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-1">U8 White Saturday</p>
+              <h1 className="text-lg font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
+              {appTeamDisplay && <p className="text-[9px] text-emjsc-red uppercase font-black tracking-[0.1em] mt-1">{appTeamDisplay}</p>}
             </div>
           </button>
 
@@ -1851,7 +1877,7 @@ export default function App() {
                     ? (() => { const { club, team } = splitOpponent(selectedGame.opponent); return `Vs ${club || team}`; })()
                     : 'Match Details'}
               </h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">{userName} • EMJSC U8 Saturday White</p>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em]">{userName}{appTeamDisplay ? ` • ${appTeamDisplay}` : ''}</p>
             </div>
           </header>
 
