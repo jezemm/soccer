@@ -1361,7 +1361,7 @@ export default function App() {
   const fetchDriblFixtures = async (): Promise<{ fixtures: any[]; debug: any } | null> => {
     if (!isAdmin) return null;
     try {
-      const res = await fetch(`${FUNCTIONS_BASE}/scrapeDribl`);
+      const res = await fetch('/api/scrape-dribl');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);

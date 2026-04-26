@@ -312,95 +312,51 @@ exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", c
         res.status(200).json({ cafes: [], cached: false });
     }
 });
-// ── Dribl fixture sync (multi-week API loop) ─────────────────────────────────
-//
-// fv.dribl.com is protected by Cloudflare and blocks GCP datacenter IPs even
-// with a stealth browser. The mc-api.dribl.com mobile API works from Cloud
-// Functions. date_range=default returns the current week only, so we iterate
-// weekly across the full FV junior season (April–October) and deduplicate.
-const DRIBL_API_BASE = "https://mc-api.dribl.com/api/fixtures";
 const DRIBL_TENANT = "w8zdBWPmBX";
-const DRIBL_HEADERS = {
-    Accept: "application/json",
-    "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
-    "X-Tenant": DRIBL_TENANT,
-};
-// Returns YYYY-MM-DD for a Date in Melbourne local time.
-function toMelbourneDate(d) {
-    return d.toLocaleDateString("en-CA", { timeZone: "Australia/Melbourne" });
-}
-// Returns HH:MM for a Date in Melbourne local time.
-function toMelbourneTime(d) {
-    return d.toLocaleTimeString("en-AU", {
-        timeZone: "Australia/Melbourne",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    });
-}
-async function fetchWeek(isoDate) {
-    const url = `${DRIBL_API_BASE}?date_range=${isoDate}` +
-        `&season=nPmrj2rmow&club=3pmvQzZrdv&tenant=${DRIBL_TENANT}&timezone=Australia%2FMelbourne`;
-    const resp = await fetch(url, { headers: DRIBL_HEADERS });
-    if (!resp.ok)
-        return [];
-    const data = await resp.json();
-    return data.data || data.fixtures || (Array.isArray(data) ? data : []);
-}
-function normaliseFixture(f) {
-    const flat = f.attributes ? Object.assign(Object.assign({}, f.attributes), { id: f.id }) : Object.assign({}, f);
-    // Convert UTC ISO date to Melbourne local date + time
-    if (flat.date && flat.date.includes("T")) {
-        const d = new Date(flat.date);
-        flat.date = toMelbourneDate(d);
-        if (!flat.time)
-            flat.time = toMelbourneTime(d);
-    }
-    // Normalise logo field names
-    if (!flat.home_team_logo && flat.home_logo)
-        flat.home_team_logo = flat.home_logo;
-    if (!flat.away_team_logo && flat.away_logo)
-        flat.away_team_logo = flat.away_logo;
-    return flat;
-}
-exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public", timeoutSeconds: 120 }, async (_req, res) => {
+const DRIBL_SEASON = "nPmrj2rmow";
+const DRIBL_CLUB = "3pmvQzZrdv";
+exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public", timeoutSeconds: 60 }, async (_req, res) => {
     try {
-        // Iterate every Saturday from season start to end (FV MiniRoos: Apr–Sep).
-        // Each call with a specific YYYY-MM-DD returns fixtures for that week.
-        const seasonStart = new Date("2026-04-01");
-        const seasonEnd = new Date("2026-10-01");
-        const seenIds = new Set();
-        const allFixtures = [];
-        const weeksFetched = [];
-        const weekErrors = [];
-        for (let d = new Date(seasonStart); d < seasonEnd; d.setDate(d.getDate() + 7)) {
-            const iso = d.toISOString().split("T")[0];
-            try {
-                const raw = await fetchWeek(iso);
-                let added = 0;
-                for (const f of raw) {
-                    const id = f.id || f.match_hash_id || JSON.stringify(f).slice(0, 60);
-                    if (seenIds.has(id))
-                        continue;
-                    seenIds.add(id);
-                    allFixtures.push(normaliseFixture(f));
-                    added++;
-                }
-                if (added > 0)
-                    weeksFetched.push(`${iso}(+${added})`);
-            }
-            catch (e) {
-                weekErrors.push(`${iso}: ${e.message}`);
-            }
-        }
-        res.status(200).json({
-            fixtures: allFixtures,
-            debug: { source: "dribl-api-multiweek", count: allFixtures.length, weeksFetched, weekErrors },
+        const params = new URLSearchParams({
+            date_range: "default",
+            season: DRIBL_SEASON,
+            club: DRIBL_CLUB,
+            tenant: DRIBL_TENANT,
+            timezone: "Australia/Melbourne",
         });
+        const upstream = await fetch(`https://mc-api.dribl.com/api/fixtures?${params.toString()}`, {
+            headers: {
+                Accept: "application/json",
+                "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
+                "X-Tenant": DRIBL_TENANT,
+            },
+        });
+        if (!upstream.ok) {
+            throw new Error(`Dribl API returned HTTP ${upstream.status}`);
+        }
+        const data = await upstream.json();
+        // Dribl API returns { data: [...] } in JSON:API style; fall back to plain arrays
+        const raw = data.data || data.fixtures || (Array.isArray(data) ? data : []);
+        const fixtures = raw.map((f) => {
+            const a = f.attributes || f;
+            return {
+                round: a.round || a.full_round || null,
+                date: a.date || null,
+                time: a.time || a.start_time || null,
+                home_team_name: a.home_team_name || a.home_team || null,
+                away_team_name: a.away_team_name || a.away_team || null,
+                home_team_logo: a.home_team_logo || a.home_logo || null,
+                away_team_logo: a.away_team_logo || a.away_logo || null,
+                venue: a.venue || a.ground_name || null,
+                field_name: a.field_name || null,
+                map_url: a.map_url || null,
+            };
+        });
+        res.status(200).json({ fixtures, debug: { total: raw.length, source: "mc-api.dribl.com" } });
     }
     catch (err) {
         console.error("scrapeDribl error:", err);
-        res.status(500).json({ error: err.message || "Failed to fetch from Dribl" });
+        res.status(500).json({ error: err.message || "Unknown error", fixtures: [] });
     }
 });
 //# sourceMappingURL=index.js.map
