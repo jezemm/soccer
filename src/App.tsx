@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -53,6 +54,7 @@ import { AvatarImage } from './components/AvatarImage';
 import { TermsModal, DocModal } from './components/TermsModal';
 import emailjs from '@emailjs/browser';
 import { DesktopNavButton, MobileNavItem, NavTab, NavButton } from './components/Nav';
+import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import { GameCard } from './components/GameCard';
 const GameDetailView = React.lazy(() => import('./components/GameDetailView').then(m => ({ default: m.GameDetailView })));
 const HelpView = React.lazy(() => import('./components/HelpView').then(m => ({ default: m.HelpView })));
@@ -2355,7 +2357,7 @@ export default function App() {
                       if (!meAsPlayer && !meAsStaff) return null;
                       const myName = (meAsPlayer?.name || meAsStaff?.name) as string;
                       const myRole = meAsStaff?.role as string | undefined;
-                      const defaultBio = meAsPlayer?.fact || meAsStaff?.tagline || '';
+                      const defaultBio = meAsPlayer?.fact || (meAsStaff as any)?.tagline || '';
                       const profileKey = myName.replace(/\s+/g, '_');
                       const myPhotoUrl = profiles[profileKey]?.photoUrl;
                       const myAvatarConfig = profiles[profileKey]?.avatarConfig;
@@ -2719,6 +2721,7 @@ export default function App() {
 
                 {view === 'admin' && (
                   <div>
+                    <ChunkErrorBoundary>
                     <Suspense fallback={null}>
                         <AdminView
                           userName={userName}
@@ -2796,6 +2799,7 @@ export default function App() {
                           onForceCalendarRefresh={handleForceCalendarRefresh}
                         />
                     </Suspense>
+                    </ChunkErrorBoundary>
                   </div>
                 )}
 

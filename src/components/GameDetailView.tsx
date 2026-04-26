@@ -237,7 +237,7 @@ export function GameDetailView({ game, user, homeGround, feedbacks, onBack, onSi
             </a>
             {!game.isHome && game.travelTimeMinutes && (
               <p className="text-slate-500 font-bold text-sm flex items-center gap-2 uppercase tracking-tight">
-                <Flag className="w-4 h-4 text-emjsc-red" title="Travel time from home ground" />
+                <Flag className="w-4 h-4 text-emjsc-red" />
                 ~{game.travelTimeMinutes} min from home ground
               </p>
             )}
