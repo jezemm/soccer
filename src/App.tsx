@@ -1556,21 +1556,20 @@ export default function App() {
         </div>
 
         {!targetPlayerProfile ? (
-          <div className="w-full px-2">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => (
-                <button
-                  key={player.name}
-                  onClick={() => setTargetPlayerProfile(player.name)}
-                  className="flex items-center gap-2 py-2 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
-                >
-                  <div className="w-6 h-6 bg-emjsc-navy rounded-full flex items-center justify-center text-[9px] font-bold text-white border border-emjsc-red shrink-0">
-                    {player.name.charAt(0)}
-                  </div>
-                  <p className="text-[11px] font-black text-slate-800 text-left leading-tight truncate">{player.name}</p>
-                </button>
-              ))}
-            </div>
+          <div className="w-full px-2 space-y-1">
+            {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => (
+              <button
+                key={player.name}
+                onClick={() => setTargetPlayerProfile(player.name)}
+                className="w-full flex items-center gap-2.5 py-2 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+              >
+                <div className="w-6 h-6 bg-emjsc-navy rounded-full flex items-center justify-center text-[9px] font-bold text-white border border-emjsc-red shrink-0">
+                  {player.name.charAt(0)}
+                </div>
+                <p className="text-[11px] font-black text-slate-800 text-left leading-tight">{player.name}</p>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
+              </button>
+            ))}
           </div>
         ) : (
           <div className="w-full space-y-4 max-w-sm">
