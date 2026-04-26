@@ -1575,7 +1575,7 @@ export default function App() {
                     photoUrl={profiles[profileKey]?.photoUrl}
                     fallbackName={player.name}
                     alt={player.name}
-                    className="w-10 h-10 rounded-full shrink-0"
+                    className="w-14 h-14 rounded-full shrink-0"
                   />
                   <p className="text-sm font-black text-slate-800 text-left leading-tight">{player.name}</p>
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
@@ -1600,7 +1600,7 @@ export default function App() {
                     photoUrl={profiles[profileKey]?.photoUrl}
                     fallbackName={account.name}
                     alt={account.name}
-                    className="w-10 h-10 rounded-full shrink-0"
+                    className="w-14 h-14 rounded-full shrink-0"
                   />
                   <div className="text-left">
                     <p className="text-sm font-black text-slate-800 leading-tight">{account.name}</p>
