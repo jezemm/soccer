@@ -4,6 +4,11 @@ process.env.TZ = "Australia/Melbourne";
 import { onRequest } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { chromium as playwrightExtra } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import chromiumBin from "@sparticuz/chromium";
+
+playwrightExtra.use(StealthPlugin());
 
 initializeApp();
 
@@ -368,6 +373,187 @@ export const cafesNearby = onRequest(
     } catch (err) {
       console.error("cafesNearby error:", err);
       res.status(200).json({ cafes: [], cached: false });
+    }
+  }
+);
+
+// ── Dribl fixture scraper ────────────────────────────────────────────────────
+
+const DRIBL_SCRAPE_URL =
+  "https://fv.dribl.com/fixtures/?date_range=default" +
+  "&season=nPmrj2rmow&competition=Rxm8RpZLKr&club=3pmvQzZrdv" +
+  "&timezone=Australia%2FMelbourne";
+
+const DRIBL_MONTH_MAP: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+function parseDriblDate(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.trim().match(/^(\d{1,2})\s+(\w{3})\s+(\d{4})$/i);
+  if (!m) return null;
+  const day = String(m[1]).padStart(2, "0");
+  const month = DRIBL_MONTH_MAP[m[2].toLowerCase()];
+  if (!month) return null;
+  return `${m[3]}-${String(month).padStart(2, "0")}-${day}`;
+}
+
+function parseDriblTime(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return `${String(m[1]).padStart(2, "0")}:${m[2]}`;
+}
+
+interface RawCard {
+  id: string;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  homeLogo: string | null;
+  awayLogo: string | null;
+  dateText: string | null;
+  timeText: string | null;
+  mapUrl: string | null;
+  venue: string | null;
+  round: string | null;
+}
+
+// Runs inside the browser via page.evaluate — must be plain serialisable JS.
+function extractDriblCards(seenIds: string[]): RawCard[] {
+  const seen = new Set(seenIds);
+  const cards = Array.from(document.querySelectorAll("[id^=\"fixture-\"]"));
+  const results: RawCard[] = [];
+  for (const card of cards) {
+    const id = (card as HTMLElement).id;
+    if (seen.has(id)) continue;
+    const nameEls = Array.from(card.querySelectorAll("span.text-level-1.tw-font-medium"));
+    const logoImgs = Array.from(card.querySelectorAll("img[class*=\"tw-w\"]")) as HTMLImageElement[];
+    const mapAnchors = Array.from(card.querySelectorAll("a[href*=\"maps.google\"]")) as HTMLAnchorElement[];
+    const venueAnchor = mapAnchors.find((a) => a.textContent?.trim());
+    const roundMatch = card.textContent?.match(/Round\s*(\d+)/i);
+    results.push({
+      id,
+      homeTeam: (nameEls[0] as HTMLElement | undefined)?.textContent?.trim() ?? null,
+      awayTeam: (nameEls[1] as HTMLElement | undefined)?.textContent?.trim() ?? null,
+      homeLogo: logoImgs[0]?.src ?? null,
+      awayLogo: logoImgs[1]?.src ?? null,
+      dateText: (card.querySelector("span.tw-font-normal") as HTMLElement | null)?.textContent?.trim() ?? null,
+      timeText: (card.querySelector(".text-level-3.pt-2") as HTMLElement | null)?.textContent?.trim() ?? null,
+      mapUrl: mapAnchors[0]?.href ?? null,
+      venue: venueAnchor?.textContent?.trim() ?? null,
+      round: roundMatch ? roundMatch[1] : null,
+    });
+  }
+  return results;
+}
+
+export const scrapeDribl = onRequest(
+  {
+    region: "australia-southeast1",
+    cors: true,
+    invoker: "public",
+    timeoutSeconds: 120,
+    memory: "2GiB",
+  },
+  async (_req, res) => {
+    let browser: Awaited<ReturnType<typeof playwrightExtra.launch>> | undefined;
+    try {
+      const executablePath = await chromiumBin.executablePath();
+      browser = await playwrightExtra.launch({
+        args: chromiumBin.args,
+        executablePath,
+        headless: true,
+      });
+
+      const page = await browser.newPage();
+      const debug = { url: DRIBL_SCRAPE_URL, totalCards: 0, pages: 1, error: null as string | null };
+
+      await page.goto(DRIBL_SCRAPE_URL, { waitUntil: "networkidle", timeout: 30000 });
+      await page.waitForTimeout(3000);
+
+      // Detect Cloudflare block early and fail fast with a clear message
+      const pageTitle = await page.title();
+      if (pageTitle.toLowerCase().includes("cloudflare") || pageTitle.toLowerCase().includes("attention required")) {
+        throw new Error("Cloudflare is blocking this request from Google Cloud servers. Run the sync from a local machine instead.");
+      }
+
+      // Dismiss cookie banner if present
+      try { await page.click("button.Cookie__button", { timeout: 2000 }); } catch { /* none */ }
+
+      // Harvest cards incrementally — virtual scroll removes off-screen nodes
+      const seenIds: string[] = [];
+      const raw: RawCard[] = [];
+
+      const harvest = async () => {
+        const batch = await page.evaluate(extractDriblCards, seenIds);
+        for (const card of batch) seenIds.push(card.id);
+        raw.push(...batch);
+      };
+
+      await harvest();
+
+      // Paginate through "Load more..." until exhausted
+      try {
+        while (true) {
+          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+          await page.waitForTimeout(800);
+
+          const hasMore = await page.evaluate(() =>
+            Array.from(document.querySelectorAll("div.d-flex.flex-column.justify-center"))
+              .some((d) => d.textContent?.includes("Load more..."))
+          );
+          if (!hasMore) break;
+
+          const countBefore = await page.evaluate(() =>
+            document.querySelectorAll("[id^=\"fixture-\"]").length
+          );
+
+          await page.evaluate(() => {
+            const el = Array.from(document.querySelectorAll("div.d-flex.flex-column.justify-center"))
+              .find((d) => d.textContent?.includes("Load more..."));
+            if (el) (el as HTMLElement).click();
+          });
+
+          try {
+            await page.waitForFunction(
+              (n: number) => document.querySelectorAll("[id^=\"fixture-\"]").length > n,
+              countBefore,
+              { timeout: 8000 }
+            );
+          } catch {
+            break;
+          }
+
+          await harvest();
+          debug.pages++;
+        }
+      } catch (loopErr: unknown) {
+        debug.error = `Load-more loop: ${loopErr instanceof Error ? loopErr.message : String(loopErr)}`;
+      }
+
+      // Final harvest for any remaining visible cards
+      await harvest();
+      debug.totalCards = raw.length;
+
+      const fixtures = raw.map((r) => ({
+        round: r.round,
+        date: parseDriblDate(r.dateText),
+        time: parseDriblTime(r.timeText),
+        home_team_name: r.homeTeam,
+        away_team_name: r.awayTeam,
+        home_team_logo: r.homeLogo,
+        away_team_logo: r.awayLogo,
+        venue: r.venue,
+        map_url: r.mapUrl,
+      }));
+
+      res.status(200).json({ fixtures, debug });
+    } catch (err: unknown) {
+      console.error("scrapeDribl error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error", fixtures: [] });
+    } finally {
+      if (browser) await browser.close();
     }
   }
 );
