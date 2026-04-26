@@ -350,6 +350,26 @@ export function getDefaultAvatarConfig(name: string): AvatarConfig {
   };
 }
 
+export const profileKey = (name: string) => name.replace(/\s+/g, '_');
+
+export function getRandomAvatarConfig(): AvatarConfig {
+  const rand = <T>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  return {
+    topType: rand(AVATAR_OPTIONS.topType),
+    accessoriesType: rand(AVATAR_OPTIONS.accessoriesType),
+    hairColor: rand(AVATAR_OPTIONS.hairColor),
+    facialHairType: rand(AVATAR_OPTIONS.facialHairType),
+    facialHairColor: rand(AVATAR_OPTIONS.facialHairColor),
+    clotheType: rand(AVATAR_OPTIONS.clotheType),
+    clotheColor: rand(AVATAR_OPTIONS.clotheColor),
+    graphicType: rand(AVATAR_OPTIONS.graphicType),
+    eyeType: rand(AVATAR_OPTIONS.eyeType),
+    eyebrowType: rand(AVATAR_OPTIONS.eyebrowType),
+    mouthType: rand(AVATAR_OPTIONS.mouthType),
+    skinColor: rand(AVATAR_OPTIONS.skinColor),
+  };
+}
+
 export function playerAvatar(name: string): string {
   const hash = (name || '').split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) & 0xfffffff, 0);
   const bg = AVATAR_COLORS[hash % AVATAR_COLORS.length];

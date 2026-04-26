@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Shuffle, Check, RefreshCw } from 'lucide-react';
-import { AvatarConfig, AVATAR_OPTIONS, getAvataaarsUrl, getDefaultAvatarConfig } from '../lib/constants';
+import { AvatarConfig, AVATAR_OPTIONS, getAvataaarsUrl, getDefaultAvatarConfig, getRandomAvatarConfig } from '../lib/constants';
 import { AvatarImage } from './AvatarImage';
 
-const LABELS: Record<keyof AvatarConfig, string> = {
+export const LABELS: Record<keyof AvatarConfig, string> = {
   topType: 'Hair / Hat',
   accessoriesType: 'Accessories',
   hairColor: 'Hair Color',
@@ -18,12 +18,12 @@ const LABELS: Record<keyof AvatarConfig, string> = {
   skinColor: 'Skin',
 };
 
-const DISPLAYED_KEYS: (keyof AvatarConfig)[] = [
+export const DISPLAYED_KEYS: (keyof AvatarConfig)[] = [
   'topType','hairColor','accessoriesType','facialHairType','facialHairColor',
   'clotheType','clotheColor','eyeType','eyebrowType','mouthType','skinColor',
 ];
 
-function formatLabel(val: string): string {
+export function formatLabel(val: string): string {
   if (val === 'EMJSCJersey') return '⚽ EMJSC Jersey';
   return val.replace(/([A-Z0-9])/g, ' $1').replace(/^\s/, '').trim();
 }
@@ -46,23 +46,7 @@ export function AvatarEditor({ initialConfig, onSave, onCancel }: AvatarEditorPr
     setConfig(c => ({ ...c, [key]: opts[next] }));
   };
 
-  const randomize = () => {
-    const rand = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-    setConfig({
-      topType: rand(AVATAR_OPTIONS.topType),
-      accessoriesType: rand(AVATAR_OPTIONS.accessoriesType),
-      hairColor: rand(AVATAR_OPTIONS.hairColor),
-      facialHairType: rand(AVATAR_OPTIONS.facialHairType),
-      facialHairColor: rand(AVATAR_OPTIONS.facialHairColor),
-      clotheType: rand(AVATAR_OPTIONS.clotheType),
-      clotheColor: rand(AVATAR_OPTIONS.clotheColor),
-      graphicType: rand(AVATAR_OPTIONS.graphicType),
-      eyeType: rand(AVATAR_OPTIONS.eyeType),
-      eyebrowType: rand(AVATAR_OPTIONS.eyebrowType),
-      mouthType: rand(AVATAR_OPTIONS.mouthType),
-      skinColor: rand(AVATAR_OPTIONS.skinColor),
-    });
-  };
+  const randomize = () => setConfig(getRandomAvatarConfig());
 
   const handleSave = async () => {
     setSaving(true);

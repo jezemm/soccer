@@ -48,7 +48,7 @@ import {
 } from 'lucide-react';
 import { db, FUNCTIONS_BASE, Game as GameType, PlayerFeedback, Message, Block, Announcement, Availability, DutyConfig, FaqItem, FeatureRequest, NotificationSettings, TrainingSession } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, setDoc, doc, writeBatch, serverTimestamp, deleteDoc, getDocs } from 'firebase/firestore';
-import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig } from './lib/constants';
+import { TEAM_SQUAD, CLUB_LOGO, AVATAR_COLORS, SEED_FAQS, splitOpponent, playerAvatar, getNextTrainingDate, getNextSaturday, getTravelTime, getGameMapUrl, formatVenueDisplay, extractDestFromMapUrl, getAvataaarsUrl, getDefaultAvatarConfig, AvatarConfig, profileKey } from './lib/constants';
 import { AvatarEditor } from './components/AvatarEditor';
 import { AvatarImage } from './components/AvatarImage';
 import { TermsModal, DocModal } from './components/TermsModal';
@@ -213,16 +213,15 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const myProfile = userName ? profiles[profileKey(userName)] : undefined;
   useEffect(() => {
-    if (!userName) return;
-    const profile = profiles[userName.replace(/\s+/g, '_')];
-    if (!profile) return;
-    if (profile.needsOnboarding === true) setShowOnboarding(true);
-    if (profile.needsTermsAcceptance === true) {
+    if (!myProfile) return;
+    if (myProfile.needsOnboarding) setShowOnboarding(true);
+    if (myProfile.needsTermsAcceptance) {
       localStorage.removeItem('teamtrack_terms_v1');
       setTermsAccepted(false);
     }
-  }, [profiles, userName]);
+  }, [myProfile]);
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'training'), (snapshot) => {
       if (snapshot.exists()) {
@@ -1498,13 +1497,14 @@ export default function App() {
     }
   };
 
-  const updateProfile = async (skills: string, photoUrl: string, avatarConfig?: any) => {
+  const updateProfile = async (skills: string, photoUrl: string, avatarConfig?: any, extra?: Record<string, any>) => {
     if (!userName) return;
     try {
-      await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), {
+      await setDoc(doc(db, 'profiles', profileKey(userName)), {
         skills,
         photoUrl,
         ...(avatarConfig ? { avatarConfig } : {}),
+        ...extra,
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (error) {
@@ -1512,21 +1512,10 @@ export default function App() {
     }
   };
 
-  const resetOnboardingForAll = async () => {
+  const resetFlagForAll = async (flag: 'needsOnboarding' | 'needsTermsAcceptance') => {
     if (!isAdmin) return;
     const batch = writeBatch(db);
-    squad.forEach(p => {
-      batch.set(doc(db, 'profiles', p.name.replace(/\s+/g, '_')), { needsOnboarding: true }, { merge: true });
-    });
-    await batch.commit();
-  };
-
-  const resetTermsForAll = async () => {
-    if (!isAdmin) return;
-    const batch = writeBatch(db);
-    squad.forEach(p => {
-      batch.set(doc(db, 'profiles', p.name.replace(/\s+/g, '_')), { needsTermsAcceptance: true }, { merge: true });
-    });
+    squad.forEach(p => batch.set(doc(db, 'profiles', profileKey(p.name)), { [flag]: true }, { merge: true }));
     await batch.commit();
   };
 
@@ -1564,31 +1553,27 @@ export default function App() {
         onAccept={() => {
           localStorage.setItem('teamtrack_terms_v1', 'accepted');
           setTermsAccepted(true);
-          setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsTermsAcceptance: false }, { merge: true }).catch(console.error);
+          setDoc(doc(db, 'profiles', profileKey(userName)), { needsTermsAcceptance: false }, { merge: true }).catch(console.error);
         }}
       />
     );
   }
 
   if (userName && showOnboarding) {
-    const onboardedKey = `teamtrack_onboarded_${userName.replace(/\s+/g, '_')}`;
-    const currentProfile = profiles[userName.replace(/\s+/g, '_')];
+    const onboardedKey = `teamtrack_onboarded_${profileKey(userName)}`;
     return (
       <OnboardingWizard
         playerName={userName}
         teamLogoUrl={teamLogoUrl}
-        initialProfile={currentProfile}
+        initialProfile={myProfile}
         onComplete={async ({ skills, avatarConfig, photoUrl, newPassword }) => {
-          await updateProfile(skills, photoUrl, avatarConfig);
-          await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsOnboarding: false }, { merge: true });
-          if (newPassword) {
-            await updatePlayerPassword(userName, newPassword);
-          }
+          await updateProfile(skills, photoUrl, avatarConfig, { needsOnboarding: false });
+          if (newPassword) await updatePlayerPassword(userName, newPassword);
           localStorage.setItem(onboardedKey, '1');
           setShowOnboarding(false);
         }}
         onSkip={() => {
-          setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsOnboarding: false }, { merge: true }).catch(console.error);
+          setDoc(doc(db, 'profiles', profileKey(userName)), { needsOnboarding: false }, { merge: true }).catch(console.error);
           localStorage.setItem(onboardedKey, '1');
           setShowOnboarding(false);
         }}
@@ -2862,8 +2847,8 @@ export default function App() {
                           calendarVersion={calendarVersion}
                           calendarUpdatedAt={calendarUpdatedAt}
                           onForceCalendarRefresh={handleForceCalendarRefresh}
-                          onResetOnboarding={resetOnboardingForAll}
-                          onResetTerms={resetTermsForAll}
+                          onResetOnboarding={() => resetFlagForAll('needsOnboarding')}
+                          onResetTerms={() => resetFlagForAll('needsTermsAcceptance')}
                         />
                     </Suspense>
                     </ChunkErrorBoundary>

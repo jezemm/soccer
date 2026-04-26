@@ -5,7 +5,34 @@ import {
   HelpCircle, Lock, Unlock, AlertCircle, Trash2, RefreshCw, Zap,
   Check, X, Plus, Lightbulb, Mail, CalendarDays, UserCheck, FileText
 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { AdminCommunications } from './AdminCommunications';
+
+function ResetAction({ label, subLabel, icon, onConfirm }: { label: string; subLabel: string; icon: React.ReactNode; onConfirm: () => Promise<void> }) {
+  const [status, setStatus] = React.useState<'idle' | 'confirm' | 'saving' | 'done'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  return (
+    <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+      <div className="space-y-1">
+        <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none flex items-center gap-1.5">{icon} {label}</p>
+        <p className="text-[8px] text-slate-400 font-bold uppercase">{status === 'done' ? 'Reset sent to all players' : subLabel}</p>
+      </div>
+      {status === 'idle' && (
+        <button onClick={() => setStatus('confirm')} className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white transition-all active:scale-95">Reset</button>
+      )}
+      {status === 'confirm' && (
+        <div className="flex gap-2">
+          <button onClick={() => setStatus('idle')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-slate-200 text-slate-600 active:scale-95">Cancel</button>
+          <button onClick={async () => { setStatus('saving'); await onConfirm(); setStatus('done'); timerRef.current = setTimeout(() => setStatus('idle'), 3000); }} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-emjsc-red text-white active:scale-95">Confirm</button>
+        </div>
+      )}
+      {status === 'saving' && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
+      {status === 'done' && <Check className="w-4 h-4 text-green-600" />}
+    </div>
+  );
+}
+
 import { AdminModeration } from './AdminModeration';
 import { MatchEditor } from './MatchEditor';
 import { DutyManager } from './DutyManager';
@@ -1149,8 +1176,6 @@ export function AdminView({
   const [fixtureIntegrationOpen, setFixtureIntegrationOpen] = useState(false);
   const isCoach = userRole === 'coach';
   const [activeTab, setActiveTab] = useState(isCoach ? 'content' : 'fixture');
-  const [onboardingResetStatus, setOnboardingResetStatus] = useState<'idle' | 'confirm' | 'saving' | 'done'>('idle');
-  const [termsResetStatus, setTermsResetStatus] = useState<'idle' | 'confirm' | 'saving' | 'done'>('idle');
 
   if (!isLoggedIn) {
     return (
@@ -1694,81 +1719,8 @@ export function AdminView({
                   Force players to re-complete the onboarding flow or re-accept the terms &amp; conditions on their next app visit.
                 </p>
 
-                {/* Onboarding reset */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none flex items-center gap-1.5">
-                      <UserCheck className="w-3 h-3" /> Profile Onboarding
-                    </p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">
-                      {onboardingResetStatus === 'done' ? 'Reset sent to all players' : 'Re-serve avatar / bio / password setup'}
-                    </p>
-                  </div>
-                  {onboardingResetStatus === 'idle' && (
-                    <button
-                      onClick={() => setOnboardingResetStatus('confirm')}
-                      className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white transition-all active:scale-95"
-                    >
-                      Reset
-                    </button>
-                  )}
-                  {onboardingResetStatus === 'confirm' && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setOnboardingResetStatus('idle')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-slate-200 text-slate-600 active:scale-95">Cancel</button>
-                      <button
-                        onClick={async () => {
-                          setOnboardingResetStatus('saving');
-                          await onResetOnboarding?.();
-                          setOnboardingResetStatus('done');
-                          setTimeout(() => setOnboardingResetStatus('idle'), 3000);
-                        }}
-                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-emjsc-red text-white active:scale-95"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  )}
-                  {onboardingResetStatus === 'saving' && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
-                  {onboardingResetStatus === 'done' && <Check className="w-4 h-4 text-green-600" />}
-                </div>
-
-                {/* Terms reset */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none flex items-center gap-1.5">
-                      <FileText className="w-3 h-3" /> Terms &amp; Conditions
-                    </p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">
-                      {termsResetStatus === 'done' ? 'Reset sent to all players' : 'Re-serve T&C acceptance screen'}
-                    </p>
-                  </div>
-                  {termsResetStatus === 'idle' && (
-                    <button
-                      onClick={() => setTermsResetStatus('confirm')}
-                      className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white transition-all active:scale-95"
-                    >
-                      Reset
-                    </button>
-                  )}
-                  {termsResetStatus === 'confirm' && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setTermsResetStatus('idle')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-slate-200 text-slate-600 active:scale-95">Cancel</button>
-                      <button
-                        onClick={async () => {
-                          setTermsResetStatus('saving');
-                          await onResetTerms?.();
-                          setTermsResetStatus('done');
-                          setTimeout(() => setTermsResetStatus('idle'), 3000);
-                        }}
-                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-emjsc-red text-white active:scale-95"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  )}
-                  {termsResetStatus === 'saving' && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
-                  {termsResetStatus === 'done' && <Check className="w-4 h-4 text-green-600" />}
-                </div>
+                <ResetAction label="Profile Onboarding" subLabel="Re-serve avatar / bio / password setup" icon={<UserCheck className="w-3 h-3" />} onConfirm={onResetOnboarding} />
+                <ResetAction label="Terms & Conditions" subLabel="Re-serve T&C acceptance screen" icon={<FileText className="w-3 h-3" />} onConfirm={onResetTerms} />
               </div>
             </div>
           </motion.div>
