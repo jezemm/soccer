@@ -212,6 +212,17 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!userName) return;
+    const profile = profiles[userName.replace(/\s+/g, '_')];
+    if (!profile) return;
+    if (profile.needsOnboarding === true) setShowOnboarding(true);
+    if (profile.needsTermsAcceptance === true) {
+      localStorage.removeItem('teamtrack_terms_v1');
+      setTermsAccepted(false);
+    }
+  }, [profiles, userName]);
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'training'), (snapshot) => {
       if (snapshot.exists()) {
@@ -1501,6 +1512,24 @@ export default function App() {
     }
   };
 
+  const resetOnboardingForAll = async () => {
+    if (!isAdmin) return;
+    const batch = writeBatch(db);
+    squad.forEach(p => {
+      batch.set(doc(db, 'profiles', p.name.replace(/\s+/g, '_')), { needsOnboarding: true }, { merge: true });
+    });
+    await batch.commit();
+  };
+
+  const resetTermsForAll = async () => {
+    if (!isAdmin) return;
+    const batch = writeBatch(db);
+    squad.forEach(p => {
+      batch.set(doc(db, 'profiles', p.name.replace(/\s+/g, '_')), { needsTermsAcceptance: true }, { merge: true });
+    });
+    await batch.commit();
+  };
+
   const appClubName = driblCache?.selectedClub || '';
   const appTeamDisplay = (() => {
     let name = driblCache?.selectedTeam ?? '';
@@ -1535,6 +1564,7 @@ export default function App() {
         onAccept={() => {
           localStorage.setItem('teamtrack_terms_v1', 'accepted');
           setTermsAccepted(true);
+          setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsTermsAcceptance: false }, { merge: true }).catch(console.error);
         }}
       />
     );
@@ -1550,6 +1580,7 @@ export default function App() {
         initialProfile={currentProfile}
         onComplete={async ({ skills, avatarConfig, photoUrl, newPassword }) => {
           await updateProfile(skills, photoUrl, avatarConfig);
+          await setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsOnboarding: false }, { merge: true });
           if (newPassword) {
             await updatePlayerPassword(userName, newPassword);
           }
@@ -1557,6 +1588,7 @@ export default function App() {
           setShowOnboarding(false);
         }}
         onSkip={() => {
+          setDoc(doc(db, 'profiles', userName.replace(/\s+/g, '_')), { needsOnboarding: false }, { merge: true }).catch(console.error);
           localStorage.setItem(onboardedKey, '1');
           setShowOnboarding(false);
         }}
@@ -2830,6 +2862,8 @@ export default function App() {
                           calendarVersion={calendarVersion}
                           calendarUpdatedAt={calendarUpdatedAt}
                           onForceCalendarRefresh={handleForceCalendarRefresh}
+                          onResetOnboarding={resetOnboardingForAll}
+                          onResetTerms={resetTermsForAll}
                         />
                     </Suspense>
                     </ChunkErrorBoundary>

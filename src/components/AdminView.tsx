@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar, Shield, Users, Utensils, MessageCircle, Settings,
   HelpCircle, Lock, Unlock, AlertCircle, Trash2, RefreshCw, Zap,
-  Check, X, Plus, Lightbulb, Mail, CalendarDays
+  Check, X, Plus, Lightbulb, Mail, CalendarDays, UserCheck, FileText
 } from 'lucide-react';
 import { AdminCommunications } from './AdminCommunications';
 import { AdminModeration } from './AdminModeration';
@@ -1142,11 +1142,15 @@ export function AdminView({
   calendarVersion = 0,
   calendarUpdatedAt = null,
   onForceCalendarRefresh,
+  onResetOnboarding,
+  onResetTerms,
 }: any) {
   const [bulkJson, setBulkJson] = useState('');
   const [fixtureIntegrationOpen, setFixtureIntegrationOpen] = useState(false);
   const isCoach = userRole === 'coach';
   const [activeTab, setActiveTab] = useState(isCoach ? 'content' : 'fixture');
+  const [onboardingResetStatus, setOnboardingResetStatus] = useState<'idle' | 'confirm' | 'saving' | 'done'>('idle');
+  const [termsResetStatus, setTermsResetStatus] = useState<'idle' | 'confirm' | 'saving' | 'done'>('idle');
 
   if (!isLoggedIn) {
     return (
@@ -1679,6 +1683,92 @@ export function AdminView({
                   </button>
                 </div>
                 <p className="text-[8px] text-slate-400 italic px-1 font-bold">Increments the feed version so calendar apps recognise new or updated events on their next sync.</p>
+              </div>
+
+              <div className="pt-6 border-t border-slate-50 space-y-4">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 flex items-center gap-2">
+                  <UserCheck className="w-3 h-3" />
+                  Onboarding &amp; Terms
+                </label>
+                <p className="text-[8px] text-slate-400 font-medium leading-relaxed px-1">
+                  Force players to re-complete the onboarding flow or re-accept the terms &amp; conditions on their next app visit.
+                </p>
+
+                {/* Onboarding reset */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none flex items-center gap-1.5">
+                      <UserCheck className="w-3 h-3" /> Profile Onboarding
+                    </p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase">
+                      {onboardingResetStatus === 'done' ? 'Reset sent to all players' : 'Re-serve avatar / bio / password setup'}
+                    </p>
+                  </div>
+                  {onboardingResetStatus === 'idle' && (
+                    <button
+                      onClick={() => setOnboardingResetStatus('confirm')}
+                      className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white transition-all active:scale-95"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  {onboardingResetStatus === 'confirm' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => setOnboardingResetStatus('idle')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-slate-200 text-slate-600 active:scale-95">Cancel</button>
+                      <button
+                        onClick={async () => {
+                          setOnboardingResetStatus('saving');
+                          await onResetOnboarding?.();
+                          setOnboardingResetStatus('done');
+                          setTimeout(() => setOnboardingResetStatus('idle'), 3000);
+                        }}
+                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-emjsc-red text-white active:scale-95"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  )}
+                  {onboardingResetStatus === 'saving' && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
+                  {onboardingResetStatus === 'done' && <Check className="w-4 h-4 text-green-600" />}
+                </div>
+
+                {/* Terms reset */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase text-emjsc-navy leading-none flex items-center gap-1.5">
+                      <FileText className="w-3 h-3" /> Terms &amp; Conditions
+                    </p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase">
+                      {termsResetStatus === 'done' ? 'Reset sent to all players' : 'Re-serve T&C acceptance screen'}
+                    </p>
+                  </div>
+                  {termsResetStatus === 'idle' && (
+                    <button
+                      onClick={() => setTermsResetStatus('confirm')}
+                      className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emjsc-navy text-white transition-all active:scale-95"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  {termsResetStatus === 'confirm' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => setTermsResetStatus('idle')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-slate-200 text-slate-600 active:scale-95">Cancel</button>
+                      <button
+                        onClick={async () => {
+                          setTermsResetStatus('saving');
+                          await onResetTerms?.();
+                          setTermsResetStatus('done');
+                          setTimeout(() => setTermsResetStatus('idle'), 3000);
+                        }}
+                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase bg-emjsc-red text-white active:scale-95"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  )}
+                  {termsResetStatus === 'saving' && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
+                  {termsResetStatus === 'done' && <Check className="w-4 h-4 text-green-600" />}
+                </div>
               </div>
             </div>
           </motion.div>
