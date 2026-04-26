@@ -372,48 +372,94 @@ export const cafesNearby = onRequest(
   }
 );
 
+// ── Dribl fixture sync (multi-week API loop) ─────────────────────────────────
+//
+// fv.dribl.com is protected by Cloudflare and blocks GCP datacenter IPs even
+// with a stealth browser. The mc-api.dribl.com mobile API works from Cloud
+// Functions. date_range=default returns the current week only, so we iterate
+// weekly across the full FV junior season (April–October) and deduplicate.
+
+const DRIBL_API_BASE = "https://mc-api.dribl.com/api/fixtures";
 const DRIBL_TENANT = "w8zdBWPmBX";
+const DRIBL_HEADERS = {
+  Accept: "application/json",
+  "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
+  "X-Tenant": DRIBL_TENANT,
+};
+
+// Returns YYYY-MM-DD for a Date in Melbourne local time.
+function toMelbourneDate(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "Australia/Melbourne" });
+}
+
+// Returns HH:MM for a Date in Melbourne local time.
+function toMelbourneTime(d: Date): string {
+  return d.toLocaleTimeString("en-AU", {
+    timeZone: "Australia/Melbourne",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+async function fetchWeek(isoDate: string): Promise<any[]> {
+  const url =
+    `${DRIBL_API_BASE}?date_range=${isoDate}` +
+    `&season=nPmrj2rmow&club=3pmvQzZrdv&tenant=${DRIBL_TENANT}&timezone=Australia%2FMelbourne`;
+  const resp = await fetch(url, { headers: DRIBL_HEADERS });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return data.data || data.fixtures || (Array.isArray(data) ? data : []);
+}
+
+function normaliseFixture(f: any): any {
+  const flat = f.attributes ? { ...f.attributes, id: f.id } : { ...f };
+  // Convert UTC ISO date to Melbourne local date + time
+  if (flat.date && flat.date.includes("T")) {
+    const d = new Date(flat.date);
+    flat.date = toMelbourneDate(d);
+    if (!flat.time) flat.time = toMelbourneTime(d);
+  }
+  // Normalise logo field names
+  if (!flat.home_team_logo && flat.home_logo) flat.home_team_logo = flat.home_logo;
+  if (!flat.away_team_logo && flat.away_logo) flat.away_team_logo = flat.away_logo;
+  return flat;
+}
 
 export const scrapeDribl = onRequest(
-  { region: "australia-southeast1", cors: true, invoker: "public" },
-  async (req, res) => {
+  { region: "australia-southeast1", cors: true, invoker: "public", timeoutSeconds: 120 },
+  async (_req, res) => {
     try {
-      const url =
-        `https://mc-api.dribl.com/api/fixtures?` +
-        `date_range=default&season=nPmrj2rmow&club=3pmvQzZrdv` +
-        `&tenant=${DRIBL_TENANT}&timezone=Australia%2FMelbourne`;
+      // Iterate every Saturday from season start to end (FV MiniRoos: Apr–Sep).
+      // Each call with a specific YYYY-MM-DD returns fixtures for that week.
+      const seasonStart = new Date("2026-04-01");
+      const seasonEnd = new Date("2026-10-01");
+      const seenIds = new Set<string>();
+      const allFixtures: any[] = [];
+      const weeksFetched: string[] = [];
+      const weekErrors: string[] = [];
 
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
-          "X-Tenant": DRIBL_TENANT,
-        },
-      });
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        console.error("Dribl API error:", response.status, text.slice(0, 200));
-        res.status(502).json({ error: `Dribl API returned ${response.status}` });
-        return;
+      for (let d = new Date(seasonStart); d < seasonEnd; d.setDate(d.getDate() + 7)) {
+        const iso = d.toISOString().split("T")[0];
+        try {
+          const raw = await fetchWeek(iso);
+          let added = 0;
+          for (const f of raw) {
+            const id = f.id || f.match_hash_id || JSON.stringify(f).slice(0, 60);
+            if (seenIds.has(id)) continue;
+            seenIds.add(id);
+            allFixtures.push(normaliseFixture(f));
+            added++;
+          }
+          if (added > 0) weeksFetched.push(`${iso}(+${added})`);
+        } catch (e: any) {
+          weekErrors.push(`${iso}: ${e.message}`);
+        }
       }
 
-      const data = await response.json();
-
-      // Normalise to flat fixture objects — the API wraps fields in an
-      // "attributes" key; flatten so the admin panel's team-name checks work.
-      const raw: any[] = data.data || data.fixtures || (Array.isArray(data) ? data : []);
-      const fixtures = raw.map((f: any) => {
-        const flat = f.attributes ? { ...f.attributes, id: f.id } : { ...f };
-        // Normalise logo field names to match what the app expects
-        if (!flat.home_team_logo && flat.home_logo) flat.home_team_logo = flat.home_logo;
-        if (!flat.away_team_logo && flat.away_logo) flat.away_team_logo = flat.away_logo;
-        return flat;
-      });
-
       res.status(200).json({
-        fixtures,
-        debug: { source: "dribl-api", count: fixtures.length },
+        fixtures: allFixtures,
+        debug: { source: "dribl-api-multiweek", count: allFixtures.length, weeksFetched, weekErrors },
       });
     } catch (err: any) {
       console.error("scrapeDribl error:", err);
