@@ -1361,7 +1361,7 @@ export default function App() {
   const fetchDriblFixtures = async (): Promise<{ fixtures: any[]; debug: any } | null> => {
     if (!isAdmin) return null;
     try {
-      const res = await fetch(`${FUNCTIONS_BASE}/scrapeDribl`);
+      const res = await fetch('/api/scrape-dribl');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
@@ -2231,20 +2231,25 @@ export default function App() {
                       <span className="text-[10px] font-bold text-white bg-emjsc-red px-2 py-1 rounded-full uppercase tracking-tighter shadow-sm">{squad.length} Players</span>
                     </div>
 
-                    {/* My Profile hero card (players only — staff show in their own section) */}
+                    {/* My Profile hero card — always first, works for players, coaches, and managers */}
                     {(() => {
-                      const me = squad.find((p: any) => p.name === userName);
-                      if (!me) return null;
-                      const profileKey = me.name.replace(/\s+/g, '_');
+                      const meAsPlayer = squad.find((p: any) => p.name === userName);
+                      const meAsStaff = !meAsPlayer ? staffAccounts.find((a: any) => a.name === userName) : null;
+                      if (!meAsPlayer && !meAsStaff) return null;
+                      const myName = (meAsPlayer?.name || meAsStaff?.name) as string;
+                      const myRole = meAsStaff?.role as string | undefined;
+                      const defaultBio = meAsPlayer?.fact || meAsStaff?.tagline || '';
+                      const profileKey = myName.replace(/\s+/g, '_');
                       const myPhotoUrl = profiles[profileKey]?.photoUrl;
                       const myAvatarConfig = profiles[profileKey]?.avatarConfig;
+                      const bio = profiles[profileKey]?.skills || defaultBio;
                       const isEditingAv = editingAvatar;
                       const isEditingBio = editingSkills !== null;
                       return (
                         <div className="bg-emjsc-navy rounded-3xl p-6 shadow-lg border-b-4 border-emjsc-red relative overflow-hidden space-y-4">
                           <div className="flex items-center gap-4">
                             <div className="relative shrink-0 w-20 h-20">
-                              <AvatarImage config={myAvatarConfig} photoUrl={myPhotoUrl} fallbackName={me.name} alt={me.name} className="w-20 h-20 rounded-2xl" />
+                              <AvatarImage config={myAvatarConfig} photoUrl={myPhotoUrl} fallbackName={myName} alt={myName} className="w-20 h-20 rounded-2xl" />
                               {!isEditingAv && !isEditingBio && (
                                 <button
                                   onClick={() => { setEditingAvatar(true); setEditingSkills(null); }}
@@ -2256,8 +2261,9 @@ export default function App() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-xl font-black text-white tracking-tighter uppercase">{me.name}</p>
+                                <p className="text-xl font-black text-white tracking-tighter uppercase">{myName}</p>
                                 <span className="text-[8px] font-black uppercase bg-white/20 text-white px-1.5 py-0.5 rounded shrink-0">You</span>
+                                {myRole && <span className="text-[8px] font-black uppercase bg-emjsc-red text-white px-1.5 py-0.5 rounded shrink-0 capitalize">{myRole}</span>}
                               </div>
                               <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-0.5">Your Profile</p>
                             </div>
@@ -2265,7 +2271,7 @@ export default function App() {
                           {isEditingAv ? (
                             <div className="bg-white rounded-2xl p-4">
                               <AvatarEditor
-                                initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(me.name)}
+                                initialConfig={profiles[profileKey]?.avatarConfig || getDefaultAvatarConfig(myName)}
                                 onSave={async (config: AvatarConfig, url: string) => { await updateProfile(profiles[profileKey]?.skills || '', url, config); setEditingAvatar(false); }}
                                 onCancel={() => setEditingAvatar(false)}
                               />
@@ -2276,28 +2282,28 @@ export default function App() {
                                 autoFocus
                                 value={editingSkills}
                                 onChange={(e) => setEditingSkills(e.target.value)}
-                                placeholder="Describe your skills, favourite position, or what you're working on..."
+                                placeholder={myRole ? "Describe yourself — your role, background, or anything you'd like the team to know..." : "Describe your skills, favourite position, or what you're working on..."}
                                 className="w-full h-24 p-3 bg-white/10 border border-white/20 rounded-xl text-[10px] font-bold text-white focus:ring-2 focus:ring-white outline-none resize-none placeholder:text-white/30"
                               />
                               <div className="flex gap-2">
                                 <button onClick={() => setEditingSkills(null)} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white/10 text-white/70 rounded-xl active:scale-95 transition-all">Cancel</button>
-                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(me.name)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
+                                <button onClick={async () => { await updateProfile(editingSkills!, profiles[profileKey]?.photoUrl || getAvataaarsUrl(getDefaultAvatarConfig(myName)), profiles[profileKey]?.avatarConfig); setEditingSkills(null); }} className="flex-1 py-2 text-[9px] font-black uppercase tracking-widest bg-white text-emjsc-navy rounded-xl active:scale-95 transition-all">Save</button>
                               </div>
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              <p className="text-[10px] font-bold text-white/80 leading-relaxed italic">"{profiles[profileKey]?.skills || me.fact}"</p>
+                              <p className="text-[10px] font-bold text-white/80 leading-relaxed italic">"{bio}"</p>
                               <div className="flex gap-2 flex-wrap">
-                                <button onClick={() => { setEditingSkills(profiles[profileKey]?.skills || ''); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-white/60 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-95">
+                                <button onClick={() => { setEditingSkills(bio); setEditingAvatar(false); }} className="text-[9px] font-black uppercase tracking-widest text-white/60 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-95">
                                   Edit Bio
                                 </button>
                               </div>
                             </div>
                           )}
-                          {!isEditingAv && (
+                          {!isEditingAv && meAsPlayer && (
                             <ChangePasswordForm
-                              playerName={me.name}
-                              onSave={(next) => updatePlayerPassword(me.name, next)}
+                              playerName={myName}
+                              onSave={(next) => updatePlayerPassword(myName, next)}
                             />
                           )}
                           <div className="absolute -bottom-6 -right-6 text-white/5 text-[120px] select-none pointer-events-none">⚽</div>
@@ -2305,8 +2311,8 @@ export default function App() {
                       );
                     })()}
 
-                    {/* Coaches */}
-                    {staffAccounts.filter((a: any) => a.role === 'coach').map((account: any) => {
+                    {/* Coaches — skip logged-in user (shown in hero card above) */}
+                    {staffAccounts.filter((a: any) => a.role === 'coach' && a.name !== userName).map((account: any) => {
                       const isMe = userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
                       const staffPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
@@ -2471,8 +2477,8 @@ export default function App() {
                       })}
                     </div>
 
-                    {/* Managers at the end */}
-                    {staffAccounts.filter((a: any) => a.role === 'manager').map((account: any) => {
+                    {/* Managers at the end — skip logged-in user (shown in hero card above) */}
+                    {staffAccounts.filter((a: any) => a.role === 'manager' && a.name !== userName).map((account: any) => {
                       const isMe = userName === account.name;
                       const profileKey = account.name.replace(/\s+/g, '_');
                       const mgrPhotoUrl = profiles[profileKey]?.photoUrl || undefined;
