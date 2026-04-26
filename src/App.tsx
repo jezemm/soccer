@@ -255,6 +255,7 @@ export default function App() {
         setDriblCache({
           fixtures: data.fixtures || [],
           allTeams: data.allTeams || data.emjscTeams || [],
+          selectedClub: data.selectedClub || '',
           selectedTeam: data.selectedTeam || '',
           savedAt: data.savedAt || new Date().toISOString(),
           competitionUrl: data.competitionUrl || '',
@@ -1387,6 +1388,7 @@ export default function App() {
       await setDoc(doc(db, 'settings', 'driblCache'), {
         fixtures: cache.fixtures,
         allTeams: cache.allTeams,
+        selectedClub: cache.selectedClub || '',
         selectedTeam: cache.selectedTeam,
         savedAt: cache.savedAt,
         competitionUrl: cache.competitionUrl || '',

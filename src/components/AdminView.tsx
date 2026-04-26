@@ -373,6 +373,7 @@ function CoachPlayerDutiesPanel({ games, dutiesConfig, squad, onManualAssign }: 
 export type DriblCache = {
   fixtures: any[];
   allTeams: string[];
+  selectedClub?: string;
   selectedTeam: string;
   savedAt: string;
   competitionUrl?: string;
@@ -381,12 +382,25 @@ export type DriblCache = {
 const DEFAULT_COMPETITION_URL =
   'https://fv.dribl.com/fixtures/?date_range=default&season=nPmrj2rmow&competition=Rxm8RpZLKr&timezone=Australia%2FMelbourne';
 
+function extractClubName(fullName: string): string {
+  const m = fullName.match(/^(.*?)\s+U\d{2,3}\b/i);
+  return m ? m[1].trim() : fullName;
+}
+
 function teamDisplayName(fullName: string): string {
   // Strip "U08 MiniRoos - Joeys Mixed " boilerplate, keeping club and grade
   return fullName
     .replace(/\s*U\d{2,3}\s+MiniRoos\s*-\s*Joeys Mixed\s*/i, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function teamWithinClubName(fullName: string, clubName: string): string {
+  const display = teamDisplayName(fullName);
+  if (clubName && display.toLowerCase().startsWith(clubName.toLowerCase())) {
+    return display.slice(clubName.length).trim();
+  }
+  return display;
 }
 
 function findTeamLogo(fixtures: any[], teamName: string): string | null {
@@ -400,7 +414,7 @@ function findTeamLogo(fixtures: any[], teamName: string): string | null {
 type ScrapePhase =
   | { tag: 'setup'; url: string }
   | { tag: 'scraping' }
-  | { tag: 'preview'; allFixtures: any[]; allTeams: string[]; selectedTeam: string; competitionUrl: string; cachedAt?: string; saving?: boolean; savedCount?: number }
+  | { tag: 'preview'; allFixtures: any[]; allTeams: string[]; selectedClub: string; selectedTeam: string; competitionUrl: string; cachedAt?: string; saving?: boolean; savedCount?: number }
   | { tag: 'error'; message: string; url: string };
 
 function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDriblCache }: {
@@ -411,11 +425,14 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
 }) {
   const initPhase = (): ScrapePhase => {
     if (driblCache && driblCache.fixtures.length > 0) {
+      const selectedTeam = driblCache.selectedTeam;
+      const selectedClub = driblCache.selectedClub || extractClubName(selectedTeam);
       return {
         tag: 'preview',
         allFixtures: driblCache.fixtures,
         allTeams: driblCache.allTeams,
-        selectedTeam: driblCache.selectedTeam,
+        selectedClub,
+        selectedTeam,
         competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
         cachedAt: driblCache.savedAt,
       };
@@ -428,18 +445,20 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   // Restore from cache when cache prop arrives asynchronously (Firestore load)
   React.useEffect(() => {
     if (!driblCache || driblCache.fixtures.length === 0) return;
-    setPhase(prev =>
-      prev.tag === 'setup'
-        ? {
-            tag: 'preview',
-            allFixtures: driblCache.fixtures,
-            allTeams: driblCache.allTeams,
-            selectedTeam: driblCache.selectedTeam,
-            competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
-            cachedAt: driblCache.savedAt,
-          }
-        : prev
-    );
+    setPhase(prev => {
+      if (prev.tag !== 'setup') return prev;
+      const selectedTeam = driblCache.selectedTeam;
+      const selectedClub = driblCache.selectedClub || extractClubName(selectedTeam);
+      return {
+        tag: 'preview',
+        allFixtures: driblCache.fixtures,
+        allTeams: driblCache.allTeams,
+        selectedClub,
+        selectedTeam,
+        competitionUrl: driblCache.competitionUrl || DEFAULT_COMPETITION_URL,
+        cachedAt: driblCache.savedAt,
+      };
+    });
   }, [driblCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startScrape = async (url: string) => {
@@ -456,16 +475,18 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         if (f.away_team_name) teamSet.add(f.away_team_name);
       }
       const allTeams = Array.from(teamSet).sort();
+      const selectedClub = allTeams.length > 0 ? extractClubName(allTeams[0]) : '';
       const selectedTeam = allTeams[0] ?? '';
       const cache: DriblCache = {
         fixtures: result.fixtures,
         allTeams,
+        selectedClub,
         selectedTeam,
         savedAt: new Date().toISOString(),
         competitionUrl: url,
       };
       await onSaveDriblCache(cache);
-      setPhase({ tag: 'preview', allFixtures: result.fixtures, allTeams, selectedTeam, competitionUrl: url, cachedAt: cache.savedAt });
+      setPhase({ tag: 'preview', allFixtures: result.fixtures, allTeams, selectedClub, selectedTeam, competitionUrl: url, cachedAt: cache.savedAt });
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Unknown error', url });
     }
@@ -473,16 +494,16 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
 
   const confirmSync = async () => {
     if (phase.tag !== 'preview' || phase.saving) return;
-    const { allFixtures, allTeams, selectedTeam, cachedAt, competitionUrl } = phase;
+    const { allFixtures, allTeams, selectedClub, selectedTeam, cachedAt, competitionUrl } = phase;
     const teamLogo = findTeamLogo(allFixtures, selectedTeam) ?? undefined;
-    setPhase({ tag: 'preview', allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving: true });
+    setPhase({ tag: 'preview', allFixtures, allTeams, selectedClub, selectedTeam, competitionUrl, cachedAt, saving: true });
     try {
       await onConfirmSync(allFixtures, selectedTeam, teamLogo);
       const count = allFixtures.filter(f =>
         (f.home_team_name || '').includes(selectedTeam) ||
         (f.away_team_name || '').includes(selectedTeam)
       ).length;
-      setPhase({ tag: 'preview', allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving: false, savedCount: count });
+      setPhase({ tag: 'preview', allFixtures, allTeams, selectedClub, selectedTeam, competitionUrl, cachedAt, saving: false, savedCount: count });
     } catch (err: any) {
       setPhase({ tag: 'error', message: err?.message || 'Sync failed', url: competitionUrl });
     }
@@ -554,7 +575,11 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
   );
 
   // ── Preview ──
-  const { allFixtures, allTeams, selectedTeam, competitionUrl, cachedAt, saving, savedCount } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
+  const { allFixtures, allTeams, selectedClub, selectedTeam, competitionUrl, cachedAt, saving, savedCount } = phase as Extract<ScrapePhase, { tag: 'preview' }>;
+
+  const allClubs = Array.from(new Set(allTeams.map(extractClubName))).sort();
+  const clubTeams = allTeams.filter(t => extractClubName(t) === selectedClub);
+
   const teamFixtures = allFixtures
     .filter(f =>
       (f.home_team_name || '').includes(selectedTeam) ||
@@ -585,26 +610,46 @@ function DriblScrapePanel({ onFetchDribl, onConfirmSync, driblCache, onSaveDribl
         </button>
       </div>
 
-      {/* Team selector */}
+      {/* Club + Team selectors */}
       <div className="space-y-2">
-        <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Select your team</p>
-        <div className="flex items-center gap-2">
-          {teamLogo && (
-            <img src={teamLogo} alt="" className="w-8 h-8 object-contain rounded shrink-0"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          )}
-          <select
-            value={selectedTeam}
-            onChange={e => setPhase({ ...phase, selectedTeam: e.target.value, savedCount: undefined })}
-            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
-          >
-            {allTeams.map(t => (
-              <option key={t} value={t}>{teamDisplayName(t)}</option>
-            ))}
-          </select>
-        </div>
-        {teamLogo && (
-          <p className="text-[9px] text-slate-400 font-medium">Team logo found — will update app logo on save</p>
+        <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Select your club</p>
+        <select
+          value={selectedClub}
+          onChange={e => {
+            const newClub = e.target.value;
+            const newTeams = allTeams.filter(t => extractClubName(t) === newClub);
+            const newTeam = newTeams[0] ?? '';
+            setPhase({ ...phase, selectedClub: newClub, selectedTeam: newTeam, savedCount: undefined });
+          }}
+          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
+        >
+          {allClubs.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
+        {clubTeams.length > 0 && (
+          <>
+            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 pt-1">Select your team</p>
+            <div className="flex items-center gap-2">
+              {teamLogo && (
+                <img src={teamLogo} alt="" className="w-8 h-8 object-contain rounded shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              )}
+              <select
+                value={selectedTeam}
+                onChange={e => setPhase({ ...phase, selectedTeam: e.target.value, savedCount: undefined })}
+                className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black text-emjsc-navy uppercase tracking-tight outline-none focus:ring-1 focus:ring-emjsc-navy"
+              >
+                {clubTeams.map(t => (
+                  <option key={t} value={t}>{teamWithinClubName(t, selectedClub)}</option>
+                ))}
+              </select>
+            </div>
+            {teamLogo && (
+              <p className="text-[9px] text-slate-400 font-medium">Team logo found — will update app logo on save</p>
+            )}
+          </>
         )}
       </div>
 
