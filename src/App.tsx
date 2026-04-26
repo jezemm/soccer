@@ -1540,7 +1540,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mt-14 w-64 mx-auto">
+        <div className="flex items-center gap-4 mt-14 w-fit mx-auto">
           <img
             src={teamLogoUrl || CLUB_LOGO}
             alt="EMJSC Logo"
@@ -1556,17 +1556,17 @@ export default function App() {
         </div>
 
         {!targetPlayerProfile ? (
-          <div className="w-64 mx-auto space-y-1">
+          <div className="w-fit mx-auto space-y-1">
             {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => (
               <button
                 key={player.name}
                 onClick={() => setTargetPlayerProfile(player.name)}
-                className="w-full flex items-center gap-2.5 py-2 px-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
               >
-                <div className="w-6 h-6 bg-emjsc-navy rounded-full flex items-center justify-center text-[9px] font-bold text-white border border-emjsc-red shrink-0">
+                <div className="w-7 h-7 bg-emjsc-navy rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-emjsc-red shrink-0">
                   {player.name.charAt(0)}
                 </div>
-                <p className="text-[11px] font-black text-slate-800 text-left leading-tight">{player.name}</p>
+                <p className="text-xs font-black text-slate-800 text-left leading-tight">{player.name}</p>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
               </button>
             ))}
