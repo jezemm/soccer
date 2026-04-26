@@ -1,36 +1,36 @@
-import {StrictMode} from 'react';
+import React, {StrictMode, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import { HashRouter } from 'react-router-dom';
+import { HashRouter, useLocation } from 'react-router-dom';
 import App from './App.tsx';
 import { TeamContextProvider } from './lib/teamDb.ts';
 import './index.css';
 
-// Superadmin portal is a fully separate UI — detect by hash prefix at page load.
-const isSuperAdmin = window.location.hash.startsWith('#/superadmin');
+const SuperAdminApp = React.lazy(() =>
+  import('./superadmin/SuperAdminApp.tsx').then(m => ({ default: m.SuperAdminApp }))
+);
 
-async function bootstrap() {
-  const root = createRoot(document.getElementById('root')!);
+function RootRouter() {
+  const { pathname } = useLocation();
 
-  if (isSuperAdmin) {
-    const { SuperAdminApp } = await import('./superadmin/SuperAdminApp.tsx');
-    root.render(
-      <StrictMode>
-        <HashRouter>
-          <SuperAdminApp />
-        </HashRouter>
-      </StrictMode>
-    );
-  } else {
-    root.render(
-      <StrictMode>
-        <HashRouter>
-          <TeamContextProvider>
-            <App />
-          </TeamContextProvider>
-        </HashRouter>
-      </StrictMode>
+  if (pathname.startsWith('/superadmin')) {
+    return (
+      <Suspense fallback={null}>
+        <SuperAdminApp />
+      </Suspense>
     );
   }
+
+  return (
+    <TeamContextProvider>
+      <App />
+    </TeamContextProvider>
+  );
 }
 
-bootstrap();
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <HashRouter>
+      <RootRouter />
+    </HashRouter>
+  </StrictMode>
+);
