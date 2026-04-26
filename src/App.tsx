@@ -1496,6 +1496,17 @@ export default function App() {
   })();
   const appHubTitle = appClubName ? `${appClubName} Hub` : 'EMJSC Hub';
 
+  useEffect(() => {
+    const iconUrl = teamLogoUrl || '/logo.svg';
+    const existing = document.querySelector("link[rel~='icon'][data-dynamic]") as HTMLLinkElement | null;
+    const link: HTMLLinkElement = existing || document.createElement('link');
+    link.rel = 'icon';
+    link.setAttribute('data-dynamic', '1');
+    link.type = teamLogoUrl ? 'image/png' : 'image/svg+xml';
+    link.href = iconUrl;
+    if (!existing) document.head.appendChild(link);
+  }, [teamLogoUrl]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
