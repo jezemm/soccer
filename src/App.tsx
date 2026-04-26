@@ -1554,27 +1554,65 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-black tracking-tight text-emjsc-navy leading-none uppercase">{appHubTitle}</h1>
             <p className="text-slate-500 text-xs font-bold italic mt-1">
-              {targetPlayerProfile === 'ADMIN' ? 'Admin sign in' : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
+              {targetPlayerProfile === 'ADMIN' && !targetAdminRole ? 'Select your account' : targetPlayerProfile === 'ADMIN' && targetAdminRole ? `Enter password for ${staffAccounts.find(a => a.id === targetAdminRole)?.name}` : targetPlayerProfile ? `Enter password for ${targetPlayerProfile}` : 'Select your player to enter'}
             </p>
           </div>
         </div>
 
+        {/* Player selection list */}
         {!targetPlayerProfile ? (
           <div className="w-fit mx-auto space-y-1">
-            {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => (
-              <button
-                key={player.name}
-                onClick={() => setTargetPlayerProfile(player.name)}
-                className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
-              >
-                <div className="w-7 h-7 bg-emjsc-navy rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-emjsc-red shrink-0">
-                  {player.name.charAt(0)}
-                </div>
-                <p className="text-xs font-black text-slate-800 text-left leading-tight">{player.name}</p>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
-              </button>
-            ))}
+            {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => {
+              const profileKey = player.name.replace(/\s+/g, '_');
+              return (
+                <button
+                  key={player.name}
+                  onClick={() => setTargetPlayerProfile(player.name)}
+                  className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                >
+                  <AvatarImage
+                    config={profiles[profileKey]?.avatarConfig}
+                    photoUrl={profiles[profileKey]?.photoUrl}
+                    fallbackName={player.name}
+                    alt={player.name}
+                    className="w-7 h-7 rounded-full shrink-0"
+                  />
+                  <p className="text-xs font-black text-slate-800 text-left leading-tight">{player.name}</p>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
+                </button>
+              );
+            })}
           </div>
+
+        /* Admin user selection list (no role chosen yet) */
+        ) : targetPlayerProfile === 'ADMIN' && !targetAdminRole ? (
+          <div className="w-fit mx-auto space-y-1">
+            {staffAccounts.map((account) => {
+              const profileKey = account.name.replace(/\s+/g, '_');
+              return (
+                <button
+                  key={account.id}
+                  onClick={() => { setTargetAdminRole(account.id); setPlayerLoginCode(''); setLoginError(null); }}
+                  className="w-full flex items-center gap-3 py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emjsc-navy hover:bg-white transition-all group active:scale-[0.98]"
+                >
+                  <AvatarImage
+                    config={profiles[profileKey]?.avatarConfig}
+                    photoUrl={profiles[profileKey]?.photoUrl}
+                    fallbackName={account.name}
+                    alt={account.name}
+                    className="w-7 h-7 rounded-full shrink-0"
+                  />
+                  <div className="text-left">
+                    <p className="text-xs font-black text-slate-800 leading-tight">{account.name}</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{account.role}</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emjsc-navy transition-colors shrink-0 ml-auto" />
+                </button>
+              );
+            })}
+          </div>
+
+        /* Password entry (player or admin with role selected) */
         ) : (
           <div className="w-full space-y-4 max-w-sm">
             <div className="space-y-4">
@@ -1583,18 +1621,6 @@ export default function App() {
                   <AlertCircle className="w-3 h-3" />
                   {loginError}
                 </div>
-              )}
-              {targetPlayerProfile === 'ADMIN' && (
-                <select
-                  value={targetAdminRole || ''}
-                  onChange={(e) => { setTargetAdminRole(e.target.value || null); setPlayerLoginCode(''); setLoginError(null); }}
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emjsc-navy outline-none font-bold text-center text-sm text-emjsc-navy"
-                >
-                  <option value="">Select user...</option>
-                  {staffAccounts.map(account => (
-                    <option key={account.id} value={account.id}>{account.name}</option>
-                  ))}
-                </select>
               )}
               <input
                 type="password"
@@ -1631,7 +1657,7 @@ export default function App() {
               />
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setTargetPlayerProfile(null); setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); }}
+                  onClick={() => { if (targetAdminRole) { setTargetAdminRole(null); setPlayerLoginCode(''); setLoginError(null); } else { setTargetPlayerProfile(null); setPlayerLoginCode(''); setLoginError(null); } }}
                   className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px] active:scale-95 transition-transform"
                 >
                   Back
