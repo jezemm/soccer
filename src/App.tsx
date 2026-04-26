@@ -1693,7 +1693,7 @@ export default function App() {
 
         <div className="flex-1 w-full relative">
           {/* Mobile Header (Hidden on Desktop) */}
-          <header className="md:hidden bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-[60]">
+          <header className="md:hidden bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-[60]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
             <div className="flex items-center justify-between">
               <button onClick={() => navigate('/schedule')} className="flex items-center gap-3 active:scale-95 transition-transform">
                 <img
@@ -1818,7 +1818,7 @@ export default function App() {
           </header>
 
           {/* Content */}
-          <main className="px-6 py-4 md:px-8 md:py-0 pb-24 md:pb-12">
+          <main className="px-6 py-4 md:px-8 md:py-0 pb-32 md:pb-12">
             {/* Breadcrumbs — mobile only (desktop shows in header) */}
             {(() => {
               const crumbs: { label: string; path?: string }[] = [{ label: 'Schedule', path: '/schedule' }];
@@ -2781,7 +2781,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* Bottom Nav (Hidden on Desktop) */}
-          <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 px-6 pt-4 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
             <NavButton active={view === 'fixtures' || view === 'game'} onClick={() => setView('fixtures')} icon={<Calendar className="w-6 h-6" />} />
             {messagingEnabled && (
               <NavButton active={view === 'messages'} onClick={() => setView('messages')} icon={<MessageCircle className="w-6 h-6" />} badge={totalUnreadMessages} />
