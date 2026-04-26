@@ -130,7 +130,7 @@ export function OnboardingWizard({ playerName, teamLogoUrl, initialProfile, onCo
   });
 
   return (
-    <div className="mobile-container flex flex-col min-h-screen bg-white">
+    <div className="mobile-container flex flex-col min-h-dvh bg-white">
       {/* Header */}
       <div className="flex items-center gap-3 p-6 border-b border-slate-100">
         <img
@@ -338,7 +338,7 @@ export function OnboardingWizard({ playerName, teamLogoUrl, initialProfile, onCo
       </div>
 
       {/* Footer navigation */}
-      <div className="p-6 border-t border-slate-100 space-y-3">
+      <div className="px-6 pt-4 pb-6 border-t border-slate-100 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="flex gap-3">
           {stepIndex > 0 && (
             <button
