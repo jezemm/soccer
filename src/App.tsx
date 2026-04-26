@@ -1556,7 +1556,7 @@ export default function App() {
         </div>
 
         {!targetPlayerProfile ? (
-          <div className="w-full px-2 space-y-1">
+          <div className="w-64 mx-auto space-y-1">
             {[...squad].sort((a, b) => a.name.localeCompare(b.name)).map((player) => (
               <button
                 key={player.name}
