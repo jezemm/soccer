@@ -55,6 +55,15 @@ function formatVenueDisplay(location: string): string {
   return pitch ? `${venue} - ${pitch}` : location;
 }
 
+function extractAddressFromMapUrl(mapUrl: string): string | null {
+  try {
+    const url = new URL(mapUrl);
+    const addr = url.searchParams.get("destination") || url.searchParams.get("query") || url.searchParams.get("q");
+    if (addr) return addr;
+  } catch {}
+  return null;
+}
+
 const DEFAULT_DUTIES = [
   { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
   { id: "goalie_2", label: "Goalie (2nd Half)", emoji: "", applicableTo: "both" },
@@ -120,12 +129,12 @@ export const fixturesICS = onRequest(
           return `${prefix}${d.label}: ${assignee || "Volunteer needed"}`;
         });
 
-        // Location string — venue name + city for Apple/Google Maps geocoding
+        // Location string — prefer the full address from the Dribl map URL (includes suburb)
         const locationName = g.location || "";
         const venueName = locationName ? getVenueName(locationName) : "";
-        const locationFull = venueName
-          ? `${venueName}, Melbourne VIC, Australia`
-          : "";
+        const mapUrlAddress = g.mapUrlOverride ? extractAddressFromMapUrl(g.mapUrlOverride) : null;
+        const locationFull = mapUrlAddress
+          || (venueName ? `${venueName}, Melbourne VIC, Australia` : "");
 
         // Google Maps search link for the description
         const mapsUrl = g.mapUrlOverride ||

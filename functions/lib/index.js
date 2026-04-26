@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scrapeDribl = exports.cafesNearby = exports.travelTime = exports.fixturesICS = void 0;
+exports.cafesNearby = exports.travelTime = exports.fixturesICS = void 0;
 // Must be first — forces Date local methods to use Melbourne time
 process.env.TZ = "Australia/Melbourne";
 const https_1 = require("firebase-functions/v2/https");
@@ -44,6 +44,16 @@ function formatVenueDisplay(location) {
     const venue = getVenueName(location);
     const pitch = location.slice(venue.length).trim();
     return pitch ? `${venue} - ${pitch}` : location;
+}
+function extractAddressFromMapUrl(mapUrl) {
+    try {
+        const url = new URL(mapUrl);
+        const addr = url.searchParams.get("destination") || url.searchParams.get("query") || url.searchParams.get("q");
+        if (addr)
+            return addr;
+    }
+    catch (_a) { }
+    return null;
 }
 const DEFAULT_DUTIES = [
     { id: "goalie", label: "Goalie (1st Half)", emoji: "", applicableTo: "both" },
@@ -101,12 +111,12 @@ exports.fixturesICS = (0, https_1.onRequest)({ region: "australia-southeast1", c
                 const prefix = d.emoji ? `${d.emoji} ` : "";
                 return `${prefix}${d.label}: ${assignee || "Volunteer needed"}`;
             });
-            // Location string — venue name + city for Apple/Google Maps geocoding
+            // Location string — prefer the full address from the Dribl map URL (includes suburb)
             const locationName = g.location || "";
             const venueName = locationName ? getVenueName(locationName) : "";
-            const locationFull = venueName
-                ? `${venueName}, Melbourne VIC, Australia`
-                : "";
+            const mapUrlAddress = g.mapUrlOverride ? extractAddressFromMapUrl(g.mapUrlOverride) : null;
+            const locationFull = mapUrlAddress
+                || (venueName ? `${venueName}, Melbourne VIC, Australia` : "");
             // Google Maps search link for the description
             const mapsUrl = g.mapUrlOverride ||
                 (venueName
@@ -310,53 +320,6 @@ exports.cafesNearby = (0, https_1.onRequest)({ region: "australia-southeast1", c
     catch (err) {
         console.error("cafesNearby error:", err);
         res.status(200).json({ cafes: [], cached: false });
-    }
-});
-const DRIBL_TENANT = "w8zdBWPmBX";
-const DRIBL_SEASON = "nPmrj2rmow";
-const DRIBL_CLUB = "3pmvQzZrdv";
-exports.scrapeDribl = (0, https_1.onRequest)({ region: "australia-southeast1", cors: true, invoker: "public", timeoutSeconds: 60 }, async (_req, res) => {
-    try {
-        const params = new URLSearchParams({
-            date_range: "default",
-            season: DRIBL_SEASON,
-            club: DRIBL_CLUB,
-            tenant: DRIBL_TENANT,
-            timezone: "Australia/Melbourne",
-        });
-        const upstream = await fetch(`https://mc-api.dribl.com/api/fixtures?${params.toString()}`, {
-            headers: {
-                Accept: "application/json",
-                "User-Agent": "Dribl/1.0 (iPhone; iOS 17.0; Scale/3.00)",
-                "X-Tenant": DRIBL_TENANT,
-            },
-        });
-        if (!upstream.ok) {
-            throw new Error(`Dribl API returned HTTP ${upstream.status}`);
-        }
-        const data = await upstream.json();
-        // Dribl API returns { data: [...] } in JSON:API style; fall back to plain arrays
-        const raw = data.data || data.fixtures || (Array.isArray(data) ? data : []);
-        const fixtures = raw.map((f) => {
-            const a = f.attributes || f;
-            return {
-                round: a.round || a.full_round || null,
-                date: a.date || null,
-                time: a.time || a.start_time || null,
-                home_team_name: a.home_team_name || a.home_team || null,
-                away_team_name: a.away_team_name || a.away_team || null,
-                home_team_logo: a.home_team_logo || a.home_logo || null,
-                away_team_logo: a.away_team_logo || a.away_logo || null,
-                venue: a.venue || a.ground_name || null,
-                field_name: a.field_name || null,
-                map_url: a.map_url || null,
-            };
-        });
-        res.status(200).json({ fixtures, debug: { total: raw.length, source: "mc-api.dribl.com" } });
-    }
-    catch (err) {
-        console.error("scrapeDribl error:", err);
-        res.status(500).json({ error: err.message || "Unknown error", fixtures: [] });
     }
 });
 //# sourceMappingURL=index.js.map
